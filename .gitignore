@@ -1,0 +1,21 @@
+# Nix build results
+result
+result-*
+
+# Direnv
+.direnv
+.envrc
+
+# Editor junk
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.gemini/
+.claude/
+.kimi/
+
+# Sops secrets (unencrypted backups)
+*.yaml.dec
+*.json.dec

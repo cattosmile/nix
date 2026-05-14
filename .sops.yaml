@@ -1,0 +1,17 @@
+keys:
+  - &admin age1f36pm8xkkmpnu2g79sdlnszvwm96988m2rzn0euv6mdepww3q32spj8gw9
+  - &desktop age13908vh96f6wh0cgzqxg05llp9nfa4gz8ren7z9lj38weumm2ncps0tjthc
+  # - &macbook <future-macbook-age-key>
+
+creation_rules:
+  - path_regex: hosts/desktop/secrets\.yaml$
+    key_groups:
+      - age:
+          - *admin
+          - *desktop
+
+#  - path_regex: hosts/macbook/secrets\.yaml$                                                             │
+#    key_groups:                                                                                          │
+#      - age:                                                                                             │
+#          - *admin                                                                                       │
+#          - *macbook
