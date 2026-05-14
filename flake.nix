@@ -10,6 +10,10 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -19,6 +23,7 @@
       nixpkgs-unstable,
       home-manager,
       sops-nix,
+      disko,
     }@inputs:
     {
       nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
@@ -27,6 +32,7 @@
         modules = [
           ./hosts/desktop/configuration.nix
           home-manager.nixosModules.home-manager
+          disko.nixosModules.disko
 
           {
             home-manager.sharedModules = [

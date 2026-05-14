@@ -8,6 +8,7 @@
     ./hardware-configuration.nix
     ../../modules/nixos
     ../../home/users/user
+    ./disko.nix
   ];
 
   # USB Filesystem Support
@@ -30,7 +31,7 @@
       timeout = 3;
     };
     initrd = {
-      luks.devices.cryptroot.device = "/dev/disk/by-uuid/cd18eb3d-d9a9-4d91-ab15-d64f7889805d";
+      #  luks.devices.cryptroot.device = "/dev/disk/by-uuid/cd18eb3d-d9a9-4d91-ab15-d64f7889805d";
       kernelModules = [ "dm_mod" ];
     };
   };
