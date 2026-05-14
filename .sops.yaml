@@ -10,8 +10,8 @@ creation_rules:
           - *admin
           - *desktop
 
-#  - path_regex: hosts/macbook/secrets\.yaml$                                                             │
-#    key_groups:                                                                                          │
-#      - age:                                                                                             │
-#          - *admin                                                                                       │
+#  - path_regex: hosts/macbook/secrets\.yaml$
+#    key_groups:
+#      - age:
+#          - *admin
 #          - *macbook

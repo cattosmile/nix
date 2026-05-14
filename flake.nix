@@ -20,17 +20,9 @@
       home-manager,
       sops-nix,
     }@inputs:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-    in
     {
-      legacyPackages.${system} = pkgs // {
-        unstable = nixpkgs-unstable.legacyPackages.${system};
-      };
-
       nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
-        inherit system;
+        system = "x86_64-linux";
         specialArgs = { inherit inputs sops-nix; };
         modules = [
           ./hosts/desktop/configuration.nix
@@ -45,7 +37,7 @@
           {
             nixpkgs.overlays = [
               (final: prev: {
-                unstable = nixpkgs-unstable.legacyPackages.${system};
+                unstable = nixpkgs-unstable.legacyPackages.${final.stdenv.hostPlatform.system};
               })
             ];
           }
