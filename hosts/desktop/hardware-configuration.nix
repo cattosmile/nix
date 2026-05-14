@@ -18,6 +18,9 @@
     "vfio_pci"
     "usbhid"
     "sd_mod"
+    "virtio_blk"
+    "virtio_pci"
+    "sr_mod"
   ];
   boot.initrd.kernelModules = [ "dm-snapshot" ];
   boot.kernelModules = [ "kvm-intel" ];
