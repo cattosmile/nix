@@ -8,7 +8,7 @@
     ./hardware-configuration.nix
     ../../modules/nixos
     ../../home/users/user
-    (import ./disko.nix { device = "/dev/disk/by-id/nvme-Force_MP600_204682290001285549B0"; })
+    ./disko.nix
   ];
 
   # USB Filesystem Support

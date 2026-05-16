@@ -17,7 +17,7 @@ fi
 
 echo ""
 echo ">>> Running disko (you will be asked to set the LUKS passphrase)..."
-nix --extra-experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko ./hosts/desktop/disko.nix
+nix --extra-experimental-features "nix-command flakes" run github:nix-community/disko -- --mode disko --flake .#desktop
 
 echo ""
 echo ">>> Decrypting age key (enter the encryption passphrase)..."
