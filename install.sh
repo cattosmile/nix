@@ -3,16 +3,15 @@ set -euo pipefail
 
 echo "=== NixOS Install Script ==="
 
-loadkeys de-latin1
-
 echo ""
 echo "Current disk device in disko.nix:"
-grep "device =" hosts/desktop/disko.nix
+echo "Target disk from flake.nix:"
+grep "device =" flake.nix | head -1
 
 echo ""
 read -p "Is this the correct disk? (y/N) " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-  echo "Edit hosts/desktop/disko.nix and re-run."
+  echo "Edit flake.nix and re-run."
   exit 1
 fi
 
@@ -29,7 +28,8 @@ nix-shell -p openssl --run \
 
 echo ""
 echo ">>> Running nixos-install..."
-nixos-install --flake .#desktop
+nixos-install --flake .#desktop --no-root-passwd
+
 echo ""
 echo ">>> Install complete. Unmounting Partitions..."
 umount -R /mnt || true

@@ -1,7 +1,5 @@
-{ ... }:
+{ device, ... }:
 let
-  device = "/dev/vda";
-
   btrfsOptions = [
     "compress=zstd"
     "noatime"
