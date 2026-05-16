@@ -30,7 +30,6 @@
         system = "x86_64-linux";
         specialArgs = {
           inherit inputs sops-nix;
-          device = "/dev/disk/by-id/nvme-Force_MP600_204682290001285549B0";
         };
         modules = [
           ./hosts/desktop/configuration.nix

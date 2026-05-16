@@ -5,13 +5,13 @@ echo "=== NixOS Install Script ==="
 
 echo ""
 echo "Current disk device in disko.nix:"
-echo "Target disk from flake.nix:"
-grep "device =" flake.nix | head -1
+echo "Target disk from configuration.nix:"
+grep "device = " hosts/desktop/configuration.nix | head -1
 
 echo ""
 read -p "Is this the correct disk? (y/N) " confirm
 if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-  echo "Edit flake.nix and re-run."
+  echo "Edit configuration.nix and re-run."
   exit 1
 fi
 

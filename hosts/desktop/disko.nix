@@ -1,4 +1,5 @@
-{ device, ... }:
+{ device }:
+{ ... }:
 let
   btrfsOptions = [
     "compress=zstd"
