@@ -48,6 +48,9 @@
   # Sops
   sops.defaultSopsFile = ./secrets.yaml;
 
+  # BTRFS maintenance
+  services.btrfs.autoScrub.enable = true;
+
   # Hostname
   networking.hostName = "nixos";
 

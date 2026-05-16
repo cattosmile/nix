@@ -40,6 +40,7 @@
             home-manager.sharedModules = [
               inputs.sops-nix.homeManagerModules.sops
             ];
+            home-manager.extraSpecialArgs = { inherit inputs; };
           }
           sops-nix.nixosModules.sops
           {
