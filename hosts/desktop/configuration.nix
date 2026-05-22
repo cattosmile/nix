@@ -13,7 +13,7 @@
 
   # USB Filesystem Support
   boot.supportedFilesystems = [
-    "ntfs"
+    # "ntfs"
     "exfat"
     "btrfs"
   ];
@@ -31,7 +31,6 @@
       timeout = 3;
     };
     initrd = {
-      #  luks.devices.cryptroot.device = "/dev/disk/by-uuid/cd18eb3d-d9a9-4d91-ab15-d64f7889805d";
       kernelModules = [
         "dm_mod"
         "dm-snapshot"

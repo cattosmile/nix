@@ -14,6 +14,8 @@
 
 {
   sops = {
+
+    # Age Key to decrypt my existing Passwords on new Machines
     age.keyFile = "/var/lib/sops-nix/key.txt";
 
     secrets = {
