@@ -1,4 +1,4 @@
-{ ... }:
+{ inputs, ... }:
 
 {
 
@@ -10,6 +10,10 @@
       "flakes"
     ];
     auto-optimise-store = true;
+    trusted-users = [
+      "root"
+      "@wheel"
+    ];
   };
 
   nix.gc = {
@@ -18,4 +22,9 @@
     dates = "weekly";
     options = "--delete-older-than 14d";
   };
+
+  nix.channel.enable = false;
+  nix.registry.nixpkgs.flake = inputs.nixpkgs;
+  programs.nix-ld.enable = true;
+  services.fwupd.enable = true;
 }

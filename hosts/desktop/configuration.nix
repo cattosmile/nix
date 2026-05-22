@@ -31,11 +31,12 @@
       timeout = 3;
     };
     initrd = {
-      kernelModules = [
-        "dm_mod"
-        "dm-snapshot"
-        "dm_crypt"
-      ];
+      systemd.enable = true;
+      #  kernelModules = [
+      #    "dm_mod"
+      #    "dm-snapshot"
+      #    "dm_crypt"
+      #  ];
     };
   };
   hardware.enableAllFirmware = true;

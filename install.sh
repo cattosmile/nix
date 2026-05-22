@@ -37,7 +37,7 @@ echo ""
 echo ">>> Copying config to /home/user/nix..."
 mkdir -p /mnt/home/user/nix
 cp -r . /mnt/home/user/nix/
-chown -R user:users /mnt/home/user/nix
+chown -R 1000:users /mnt/home/user/nix
 
 # Unmount drives
 echo ""

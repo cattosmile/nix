@@ -12,6 +12,8 @@
 # 3. Create hosts/<hostname>/secrets.yaml with sops
 # 4. Run: nix run nixpkgs#sops updatekeys hosts/<hostname>/secrets.yaml
 
+# Encrypted Age Key is backed up on Server and Password Manager if lost.
+
 {
   sops = {
 

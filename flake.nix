@@ -29,7 +29,7 @@
       nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = {
-          inherit inputs sops-nix;
+          inherit inputs;
           device = "/dev/disk/by-id/nvme-Force_MP600_204682290001285549B0";
         };
         modules = [
