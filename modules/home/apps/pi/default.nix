@@ -17,6 +17,7 @@ let
           --prefix PATH : ${lib.makeBinPath [ pkgs.nodejs ]}
       '';
 in
+
 {
   home.packages = [ pi-wrapped ];
 
@@ -28,6 +29,8 @@ in
   };
 
   xdg.configFile."pi/agent/settings.json".source = ./settings.json;
+
+  # xdg.configFile."pi/agent/skills/nixos/SKILL.md".source = ./skills/nixos/SKILL.md;
+
   xdg.configFile."pi/agent/AGENTS.md".source = ./AGENTS.md;
-  xdg.configFile."pi/agent/skills/nixos/SKILL.md".source = ./skills/nixos/SKILL.md;
 }
