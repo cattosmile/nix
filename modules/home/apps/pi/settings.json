@@ -13,7 +13,6 @@
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:@plannotator/pi-extension",
     "npm:pi-lens",
-    "npm:pi-hermes-memory",
     "git:github.com/jonjonrankin/pi-caveman"
   ],
   "skills": [],
