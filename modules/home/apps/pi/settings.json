@@ -4,7 +4,7 @@
   "defaultThinkingLevel": "medium",
   "theme": "dark",
   "enableInstallTelemetry": false,
-  "packages": [],
+  "packages": ["npm:context-mode", "npm:pi-subagents"],
   "skills": [],
   "extensions": [],
   "prompts": [],
