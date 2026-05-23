@@ -1,7 +1,24 @@
-{ config, pkgs, ... }:
-
 {
-  home.packages = [ pkgs.unstable.pi-coding-agent ];
+  config,
+  pkgs,
+  lib,
+  ...
+}:
+
+let
+  pi-wrapped =
+    pkgs.runCommand "pi-coding-agent-wrapped"
+      {
+        nativeBuildInputs = [ pkgs.makeBinaryWrapper ];
+      }
+      ''
+        mkdir -p $out/bin
+        makeWrapper ${lib.getExe pkgs.unstable.pi-coding-agent} $out/bin/pi \
+          --prefix PATH : ${lib.makeBinPath [ pkgs.nodejs ]}
+      '';
+in
+{
+  home.packages = [ pi-wrapped ];
 
   home.sessionVariables = {
     PI_CODING_AGENT_DIR = "${config.xdg.configHome}/pi/agent";
