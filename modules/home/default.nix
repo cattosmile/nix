@@ -5,5 +5,6 @@
     ./terminal
     ./packages.nix
     ./apps
+    ./desktop
   ];
 }

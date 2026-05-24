@@ -23,7 +23,6 @@
     options = "--delete-older-than 14d";
   };
 
-  nix.channel.enable = false;
   nix.registry.nixpkgs.flake = inputs.nixpkgs;
   programs.nix-ld.enable = true;
   services.fwupd.enable = true;

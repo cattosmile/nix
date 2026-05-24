@@ -14,6 +14,19 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hyprland.url = "github:hyprwm/Hyprland";
+    hyprpaper = {
+      url = "github:hyprwm/hyprpaper";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nur = {
+      url = "github:nix-community/NUR";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixcord = {
+      url = "github:kaylorben/nixcord";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -24,6 +37,7 @@
       home-manager,
       sops-nix,
       disko,
+      ...
     }@inputs:
     {
       nixosConfigurations.desktop = nixpkgs.lib.nixosSystem {
@@ -45,6 +59,7 @@
           sops-nix.nixosModules.sops
           {
             nixpkgs.overlays = [
+              inputs.nur.overlays.default
               (final: prev: {
                 unstable = nixpkgs-unstable.legacyPackages.${final.stdenv.hostPlatform.system};
               })
