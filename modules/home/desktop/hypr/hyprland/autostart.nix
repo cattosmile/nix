@@ -9,7 +9,7 @@
   wayland.windowManager.hyprland.settings = {
     exec-once = [
       "systemctl --user start hyprpolkitagent"
-      #  "quickshell -p ${./Quickshell} &"
+      "quickshell"
       "${inputs.hyprpaper.packages.${pkgs.stdenv.hostPlatform.system}.default}/bin/hyprpaper"
       "dunst"
       "hyprctl setcursor ${config.home.pointerCursor.name} ${toString config.home.pointerCursor.size}"

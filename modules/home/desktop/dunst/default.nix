@@ -2,7 +2,7 @@
 
 {
   services.dunst = {
-    enable = true;
+    enable = false;
     settings = {
       global = {
         monitor = "DP-2";

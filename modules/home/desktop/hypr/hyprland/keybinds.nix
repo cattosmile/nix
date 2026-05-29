@@ -26,8 +26,8 @@
 
     bind = [
       # Screenshots
-      "$mainMod SHIFT, S, exec, grim -g \"slurp -w 0)\" - | wl-copy"
-      "$mainMod SHIFT, E, exec, wl-paste | bin/swappy -f -"
+      "$mainMod SHIFT, S, exec, grim -g \"\$(slurp -w 0)\" - | wl-copy"
+      "$mainMod SHIFT, E, exec, wl-paste | swappy -f -"
 
       # Programs
       "$mainMod, RETURN, exec, $terminal"
@@ -35,7 +35,7 @@
       "$mainMod, SPACE, exec, $menu"
 
       # Window Management
-      "$mainMod, Q, exec, killactive"
+      "$mainMod, Q, killactive,"
       "$mainMod, M, exit"
       "$mainMod, V, togglefloating,"
       "$mainMod, J, layoutmsg, togglesplit"

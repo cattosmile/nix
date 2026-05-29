@@ -24,7 +24,7 @@ echo ""
 echo ">>> Decrypting age key (enter the encryption passphrase)..."
 mkdir -p /mnt/var/lib/sops-nix
 nix-shell -p openssl --run \
-  "openssl enc -aes-256-cbc -pbkdf2 -d -in hosts/desktop/nixos-age-key.enc -out /mnt/var/lib/sops-nix/key.txt"
+  "openssl enc -aes-256-cbc -pbkdf2 -d -in hosts/desktop/nixos-age-key.enc -out /mnt/var/lib/sops-nix/keys.txt"
 
 # Install NixOS
 echo ""
@@ -37,7 +37,10 @@ echo ""
 echo ">>> Copying config to /home/user/nix..."
 mkdir -p /mnt/home/user/nix
 cp -r . /mnt/home/user/nix/
+mkdir -p /mnt/home/user/.config/sops/age
+cp /mnt/var/lib/sops-nix/keys.txt /mnt/home/user/.config/sops/age/keys.txt
 chown -R 1000:users /mnt/home/user/nix
+chown -R 1000:users /mnt/home/user/.config/sops
 
 # Unmount drives
 echo ""

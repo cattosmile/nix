@@ -17,6 +17,7 @@ Scope {
             BorderWindow    { screen: perScreen.modelData }
             BorderExclusions { screen: perScreen.modelData }
             BarWindow       { screen: perScreen.modelData }
+            NotifPopup      { screen: perScreen.modelData }
         }
     }
 }

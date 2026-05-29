@@ -5,7 +5,7 @@
     enable = true;
     enableDefaultConfig = false;
 
-    # Add Shortcut for Homeserver
+    # Homeserver
     matchBlocks.mini = {
       hostname = "192.168.1.117";
       user = "user";

@@ -5,6 +5,7 @@
 #
 # Edit Secrets:
 # nix run nixpkgs#sops -- hosts/<hostname>/secrets.yaml
+# sops -- hosts/desktop/secrets.yaml
 #
 # Add new host:
 # 1. On the new host: cat /etc/ssh/ssh_host_ed25519_key.pub | ssh-to-age
@@ -18,7 +19,7 @@
   sops = {
 
     # Age Key to decrypt my existing Passwords on new Machines
-    age.keyFile = "/var/lib/sops-nix/key.txt";
+    age.keyFile = "/var/lib/sops-nix/keys.txt";
 
     secrets = {
       user_password = {

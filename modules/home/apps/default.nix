@@ -9,5 +9,6 @@
     ./alacritty
     ./mangohud
     ./looking-glass
+    ./spicetify
   ];
 }

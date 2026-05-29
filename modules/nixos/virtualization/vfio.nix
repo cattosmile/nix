@@ -2,7 +2,6 @@
 
 {
   virtualisation.libvirtd = {
-    enable = true;
     qemu = {
       verbatimConfig = ''
         cgroup_device_acl = [

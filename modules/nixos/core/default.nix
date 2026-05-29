@@ -4,7 +4,7 @@
   imports = [
     ./users.nix
     ./locale.nix
-    ./networkmanager.nix
+    ./networking.nix
     ./tty.nix
     ./system.nix
     ./ssh.nix
