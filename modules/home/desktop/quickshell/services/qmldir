@@ -4,4 +4,3 @@ singleton Recorder Recorder.qml
 singleton Vpn Vpn.qml
 singleton Bluetooth Bluetooth.qml
 singleton Wifi Wifi.qml
-singleton Notifs Notifs.qml

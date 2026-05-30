@@ -2,7 +2,7 @@
 
 let
   win10nvmeXml = pkgs.writeText "win10-nvme.xml" ''
-        <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
+    <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
       <name>win10-nvme</name>
       <uuid>7c2a4b91-d83f-4e12-a6b4-928c7f1e5d3a</uuid>
       <metadata>
@@ -57,7 +57,7 @@ let
         </chassis>
       </sysinfo>
       <os firmware="efi">
-        <type arch="x86_64" machine="pc-q35-10.1">hvm</type>
+        <type arch="x86_64" machine="pc-q35-10.2">hvm</type>
         <firmware>
           <feature enabled="no" name="enrolled-keys"/>
           <feature enabled="yes" name="secure-boot"/>
@@ -269,22 +269,162 @@ let
       </qemu:commandline>
     </domain>
   '';
+
+  win10normalXml = pkgs.writeText "win10-normal.xml" ''
+    <domain type="kvm">
+      <name>win10-normal</name>
+      <uuid>8f4e3c2b-1a0d-4e5f-8c7b-6a5d4e3f2c1b</uuid>
+      <metadata>
+        <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
+          <libosinfo:os id="http://microsoft.com/win/10"/>
+        </libosinfo:libosinfo>
+      </metadata>
+      <memory unit="KiB">8388608</memory>
+      <currentMemory unit="KiB">8388608</currentMemory>
+      <vcpu placement="static">4</vcpu>
+      <os firmware="efi">
+        <type arch="x86_64" machine="pc-q35-10.2">hvm</type>
+        <firmware>
+          <feature enabled="no" name="enrolled-keys"/>
+          <feature enabled="yes" name="secure-boot"/>
+        </firmware>
+        <loader readonly="yes" secure="yes" type="pflash" format="raw">/run/libvirt/nix-ovmf/edk2-x86_64-secure-code.fd</loader>
+        <nvram template="/run/libvirt/nix-ovmf/edk2-i386-vars.fd" templateFormat="raw" format="raw">/var/lib/libvirt/qemu/nvram/win10-normal_VARS.fd</nvram>
+        <smbios mode="host"/>
+      </os>
+      <features>
+        <acpi/>
+        <apic/>
+        <hyperv mode="custom">
+          <relaxed state="on"/>
+          <vapic state="on"/>
+          <spinlocks state="on" retries="8191"/>
+          <vpindex state="on"/>
+          <runtime state="on"/>
+          <synic state="on"/>
+          <stimer state="on"/>
+          <reset state="on"/>
+          <vendor_id state="on" value="GenuineIntel"/>
+          <frequencies state="on"/>
+        </hyperv>
+        <kvm>
+          <hidden state="on"/>
+        </kvm>
+        <vmport state="off"/>
+        <smm state="on"/>
+      </features>
+      <cpu mode="host-passthrough" check="none" migratable="on">
+        <topology sockets="1" dies="1" clusters="1" cores="2" threads="2"/>
+        <cache mode="passthrough"/>
+        <feature policy="disable" name="hypervisor"/>
+      </cpu>
+      <clock offset="localtime">
+        <timer name="rtc" tickpolicy="catchup"/>
+        <timer name="pit" tickpolicy="delay"/>
+        <timer name="hpet" present="no"/>
+        <timer name="hypervclock" present="yes"/>
+        <timer name="tsc" present="yes" mode="native"/>
+      </clock>
+      <on_poweroff>destroy</on_poweroff>
+      <on_reboot>restart</on_reboot>
+      <on_crash>destroy</on_crash>
+      <pm>
+        <suspend-to-mem enabled="no"/>
+        <suspend-to-disk enabled="no"/>
+      </pm>
+      <devices>
+        <emulator>/run/libvirt/nix-emulators/qemu-system-x86_64</emulator>
+        <controller type="sata" index="0"/>
+        <controller type="usb" index="0" model="qemu-xhci" ports="15"/>
+        <controller type="virtio-serial" index="0"/>
+        <disk type="file" device="disk">
+          <driver name="qemu" type="qcow2"/>
+          <source file="/var/lib/libvirt/images/win10-normal.qcow2"/>
+          <target dev="sda" bus="sata"/>
+          <boot order="1"/>
+        </disk>
+        <interface type="network">
+          <mac address="52:54:00:ab:cd:ef"/>
+          <source network="default"/>
+          <model type="e1000e"/>
+        </interface>
+        <serial type="pty">
+          <target type="isa-serial" port="0">
+            <model name="isa-serial"/>
+          </target>
+        </serial>
+        <console type="pty">
+          <target type="serial" port="0"/>
+        </console>
+        <channel type="spicevmc">
+          <target type="virtio" name="com.redhat.spice.0"/>
+        </channel>
+        <input type="tablet" bus="usb"/>
+        <input type="keyboard" bus="usb"/>
+        <graphics type="spice" autoport="yes" listen="127.0.0.1">
+          <listen type="address" address="127.0.0.1"/>
+          <image compression="off"/>
+        </graphics>
+        <sound model="ich9"/>
+        <audio id="1" type="spice"/>
+        <video>
+          <model type="qxl" ram="65536" vram="65536" vgamem="16384" heads="1" primary="yes"/>
+        </video>
+        <memballoon model="virtio"/>
+      </devices>
+    </domain>
+  '';
 in
 {
+  systemd.services.libvirt-create-win10-normal-disk = {
+    description = "Create win10-normal 100GB disk image";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" ];
+    path = [ pkgs.qemu ];
+    script = ''
+      mkdir -p /var/lib/libvirt/images
+      if [ ! -f /var/lib/libvirt/images/win10-normal.qcow2 ]; then
+        qemu-img create -f qcow2 /var/lib/libvirt/images/win10-normal.qcow2 100G
+      fi
+    '';
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+  };
+
+  systemd.services.libvirtd-config = {
+    serviceConfig.ExecStartPre = [
+      "${pkgs.coreutils}/bin/rm -rf /var/cache/libvirt/qemu/capabilities"
+    ];
+  };
+
   systemd.services.libvirt-define-win10-nvme = {
     description = "Declaratively define the win10-nvme VM";
     wantedBy = [ "multi-user.target" ];
-    after = [ "libvirtd.service" ];
-    requires = [ "libvirtd.service" ];
+    after = [ "libvirtd.service" "libvirtd-config.service" ];
+    requires = [ "libvirtd.service" "libvirtd-config.service" ];
     path = [ pkgs.libvirt ];
 
-    # This script runs every time you `nixos-rebuild switch`
     script = ''
-      # Define the VM from the Nix store XML
       virsh define ${win10nvmeXml}
+    '';
 
-      # Optional: Make the VM start automatically on boot
-      # virsh autostart win10-nvme
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+  };
+
+  systemd.services.libvirt-define-win10-normal = {
+    description = "Declaratively define the win10-normal VM";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "libvirtd.service" "libvirtd-config.service" "libvirt-create-win10-normal-disk.service" ];
+    requires = [ "libvirtd.service" "libvirtd-config.service" ];
+    path = [ pkgs.libvirt ];
+
+    script = ''
+      virsh define ${win10normalXml}
     '';
 
     serviceConfig = {

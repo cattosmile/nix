@@ -8,5 +8,3 @@ MenuIsland 1.0 MenuIsland.qml
 StatusIsland 1.0 StatusIsland.qml
 TrayIsland 1.0 TrayIsland.qml
 WorkspaceSwitcher 1.0 WorkspaceSwitcher.qml
-NotifPopup 1.0 NotifPopup.qml
-NotifCard 1.0 NotifCard.qml

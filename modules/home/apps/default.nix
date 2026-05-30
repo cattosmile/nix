@@ -10,5 +10,6 @@
     ./mangohud
     ./looking-glass
     ./spicetify
+    ./flatpak
   ];
 }

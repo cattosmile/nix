@@ -32,6 +32,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     spicetify-nix.url = "github:Gerg-L/spicetify-nix";
+    nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=latest";
   };
 
   outputs =
@@ -42,6 +43,7 @@
       home-manager,
       sops-nix,
       disko,
+      nix-flatpak,
       ...
     }@inputs:
     {
@@ -57,7 +59,9 @@
           disko.nixosModules.disko
           {
             home-manager.sharedModules = [
+              ({ pkgs, ... }: { _module.args.unstable = pkgs.unstable; })
               inputs.sops-nix.homeManagerModules.sops
+              nix-flatpak.homeManagerModules.nix-flatpak
             ];
             home-manager.extraSpecialArgs = { inherit inputs; };
           }
@@ -66,7 +70,10 @@
             nixpkgs.overlays = [
               inputs.nur.overlays.default
               (final: prev: {
-                unstable = nixpkgs-unstable.legacyPackages.${final.stdenv.hostPlatform.system};
+                unstable = import nixpkgs-unstable {
+                  system = final.stdenv.hostPlatform.system;
+                  config = prev.config;
+                };
               })
             ];
           }
