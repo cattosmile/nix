@@ -29,6 +29,18 @@ QtObject {
     property color islandMuted:    "#888888"
     property color islandDisabled: "#555555"
 
+    // ── Notifications ─────────────────────────────────────────────────────
+    readonly property real  notifWidth:       400
+    readonly property real  notifSpacing:     12
+    readonly property real  notifPadding:     14
+    readonly property real  notifAvatarSize:  46
+    readonly property real  notifRadius:      18
+    readonly property int   notifMaxVisible:  5
+    readonly property int   notifDefaultTimeout: 5000
+    property color notifBg:       "#141414"
+    property color notifBorder:   "#2a2a2a"
+    property color notifCritical: "#c03030"
+
     // ── Derived ───────────────────────────────────────────────────────────
     readonly property color frameColor: surface
 
