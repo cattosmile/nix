@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 
 Rectangle {
@@ -18,7 +19,7 @@ Rectangle {
             anchors.centerIn: parent
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            text: "Menu Item " + (itemIndex + 1)
+            text: "Menu Item " + (root.itemIndex + 1)
             color: Theme.text
             font.pixelSize: 18
         }

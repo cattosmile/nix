@@ -31,31 +31,31 @@ Item {
         color: Theme.islandBg
     }
 
-    // Right-click WiFi → floating Alacritty with nmtui.
+    // Right-click WiFi -> floating Alacritty with nmtui.
     Component {
         id: nmtuiTerm
         Process {
-            command: ["hyprctl", "dispatch", "exec", "alacritty --title float_alacritty -e bash -c 'nmtui; exec bash'"]
+            command: ["hyprctl", "dispatch", "exec", "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -c 'nmtui; exec bash'"]
             running: true
             onRunningChanged: if (!running) destroy()
         }
     }
 
-    // Right-click VPN → floating Alacritty that runs mullvad status, then drops to a shell.
+    // Right-click VPN -> floating Alacritty that runs mullvad status, then drops to a shell.
     Component {
         id: mullvadStatusTerm
         Process {
-            command: ["hyprctl", "dispatch", "exec", "alacritty --title float_alacritty -e bash -c 'mullvad status; exec bash'"]
+            command: ["hyprctl", "dispatch", "exec", "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -c 'mullvad status; exec bash'"]
             running: true
             onRunningChanged: if (!running) destroy()
         }
     }
 
-    // Right-click Bluetooth → floating Alacritty with bluetoothctl.
+    // Right-click Bluetooth -> floating Alacritty with bluetoothctl.
     Component {
         id: bluetoothctlTerm
         Process {
-            command: ["hyprctl", "dispatch", "exec", "alacritty --title float_alacritty -e bash -c 'bluetoothctl; exec bash'"]
+            command: ["hyprctl", "dispatch", "exec", "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -c 'bluetoothctl; exec bash'"]
             running: true
             onRunningChanged: if (!running) destroy()
         }
@@ -121,7 +121,7 @@ Item {
 
             TapHandler {
                 acceptedButtons: Qt.RightButton
-                enabled: slot.index === 0 || slot.index === 1 || slot.index === 2
+                enabled: slot.index <= 2
                 onTapped: {
                     if (slot.index === 0)      nmtuiTerm.createObject(root)
                     else if (slot.index === 1) bluetoothctlTerm.createObject(root)

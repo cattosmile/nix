@@ -6,9 +6,11 @@ import Quickshell.Wayland
 PanelWindow {
     id: root
 
+    required property BarState barState
+
     color: "transparent"
 
-    WlrLayershell.layer:         WlrLayer.Top
+    WlrLayershell.layer:         WlrLayer.Overlay
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     WlrLayershell.namespace:     "qs-bar"
@@ -31,17 +33,19 @@ PanelWindow {
     implicitWidth: Theme.expandedWidth
 
     onVisualWidthChanged: {
-        Theme.activeBarWidth = Math.max(Theme.barWidth, visualWidth)
+        // Frame hole tracks the visible bar; exclusion is committed once per toggle.
+        barState.activeBarWidth = Math.max(Theme.barWidth, visualWidth)
     }
 
     onExpandedChanged: {
         if (expanded) {
             collapseAnim.stop()
-            // Reserve space immediately so the bar grows into already-inset layout.
-            Theme.exclusionBarWidth = Theme.expandedWidth
+            // One layout transition — Hyprland windowsMove runs in parallel with the bar.
+            barState.exclusionBarWidth = Theme.expandedWidth
             expandAnim.start()
         } else {
             expandAnim.stop()
+            barState.exclusionBarWidth = Theme.barWidth
             collapseAnim.start()
         }
     }
@@ -70,10 +74,6 @@ PanelWindow {
         duration: 700
         easing.type:        Easing.BezierSpline
         easing.bezierCurve: [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
-        // Release reserved space after the bar finishes closing — avoids
-        // relayouting every animation frame while keeping windows out from
-        // under the bar during the visual shrink.
-        onFinished: Theme.exclusionBarWidth = Theme.barWidth
     }
 
     Rectangle {
@@ -109,6 +109,33 @@ PanelWindow {
                 id: workspaceSwitcher
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter:   parent.verticalCenter
+            }
+
+            // Dummy button: toggles the centered popup rectangle.
+            Rectangle {
+                id: popupButton
+                width:  Theme.islandWidth
+                height: Theme.islandWidth
+                radius: width / 2
+                color:  root.barState.centerPopupVisible ? Theme.islandActive : Theme.islandBg
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom:           workspaceSwitcher.top
+                anchors.bottomMargin:     12
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text:  "+"
+                    color: root.barState.centerPopupVisible ? Theme.islandBg : Theme.islandActive
+                    font.pixelSize: 20
+                }
+
+                HoverHandler { cursorShape: Qt.PointingHandCursor }
+
+                TapHandler {
+                    onTapped: root.barState.centerPopupVisible = !root.barState.centerPopupVisible
+                }
             }
 
             TrayIsland {
@@ -177,16 +204,24 @@ PanelWindow {
             spacing:     12
             interactive: root.expanded
             snapMode:    ListView.SnapToItem
-            model:       10800  // 9 × 1200; item 1 wraps after item 9
+
+            // Fake "infinite" wrap-around scroll: the real menu has `itemCount`
+            // entries, repeated `repeats` times so you can scroll past either end.
+            readonly property int itemCount:  9
+            readonly property int repeats:    1200
+            readonly property int scrollStep: 6
+            model: itemCount * repeats
 
             delegate: MenuIsland {
                 required property int index
-                itemIndex: index % 9
+                itemIndex: index % menuList.itemCount
                 width:     menuList.width
             }
 
-            // Start at index 5400 (= 9 × 600, middle of model → shows item 1 first)
-            Component.onCompleted: Qt.callLater(() => positionViewAtIndex(5400, ListView.Beginning))
+            // Start in the middle of the model (showing item 1) so there's room
+            // to wrap in both directions.
+            Component.onCompleted: Qt.callLater(() =>
+                positionViewAtIndex(menuList.itemCount * menuList.repeats / 2, ListView.Beginning))
         }
 
         // Sits above ListView to intercept wheel before Flickable's C++ handler.
@@ -199,7 +234,7 @@ PanelWindow {
                 onWheel: (event) => {
                     const slotH = menuList.contentHeight / menuList.count
                     const curIdx = Math.round(menuList.contentY / slotH)
-                    const steps = event.angleDelta.y < 0 ? 6 : -6
+                    const steps = event.angleDelta.y < 0 ? menuList.scrollStep : -menuList.scrollStep
                     menuList.positionViewAtIndex(
                         Math.max(0, Math.min(menuList.count - 1, curIdx + steps)),
                         ListView.Beginning

@@ -9,6 +9,7 @@ Scope {
     id: root
 
     required property ShellScreen screen
+    required property BarState barState
 
     ExclusionZone {
         anchors.top:   true
@@ -31,11 +32,12 @@ Scope {
         implicitHeight: 1
     }
 
-    // Right zone is wider — reserves space for the bar column.
+    // Right zone — exclusiveZone reserves space; keep implicitWidth minimal
+    // so Hyprland layout updates don't also resize this PanelWindow every frame.
     ExclusionZone {
         anchors.right:  true
-        exclusiveZone:  Theme.exclusionBarWidth
-        implicitWidth:  Theme.exclusionBarWidth
+        exclusiveZone:  root.barState.exclusionBarWidth
+        implicitWidth:  1
         implicitHeight: 1
     }
 

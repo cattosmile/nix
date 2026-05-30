@@ -55,6 +55,11 @@ Rectangle {
     }
 
     TapHandler {
+        acceptedButtons: Qt.LeftButton
+        onTapped: Quickshell.execDetached(["pavucontrol"])
+    }
+
+    TapHandler {
         acceptedButtons: Qt.MiddleButton
         onTapped: Audio.toggleMute()
     }

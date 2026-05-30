@@ -9,6 +9,8 @@ import Quickshell.Wayland
 PanelWindow {
     id: root
 
+    required property BarState barState
+
     color: "transparent"
 
     WlrLayershell.layer:         WlrLayer.Top
@@ -28,7 +30,7 @@ PanelWindow {
         anchors.fill: parent
 
         readonly property real t:  Theme.frameThickness
-        readonly property real bw: Theme.activeBarWidth
+        readonly property real bw: root.barState.activeBarWidth
         readonly property real r:  Theme.innerRadius
         readonly property real ix: t
         readonly property real iy: t

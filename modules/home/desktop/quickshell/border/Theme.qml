@@ -12,8 +12,6 @@ QtObject {
     readonly property real innerRadius: 24
     readonly property real islandWidth: 34
     readonly property real expandedWidth: 520
-    property real activeBarWidth: barWidth
-    property real exclusionBarWidth: barWidth
 
     // ── Palette ───────────────────────────────────────────────────────────
     property color surface:   "#000000"  // frame fill

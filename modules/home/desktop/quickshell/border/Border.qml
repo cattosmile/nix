@@ -14,9 +14,12 @@ Scope {
             id: perScreen
             required property ShellScreen modelData
 
-            BorderWindow    { screen: perScreen.modelData }
-            BorderExclusions { screen: perScreen.modelData }
-            BarWindow       { screen: perScreen.modelData }
+            BarState { id: barState }
+
+            BorderWindow     { screen: perScreen.modelData; barState: barState }
+            BorderExclusions { screen: perScreen.modelData; barState: barState }
+            CenterPopup      { screen: perScreen.modelData; barState: barState }
+            BarWindow        { screen: perScreen.modelData; barState: barState }
         }
     }
 }

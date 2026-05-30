@@ -1,4 +1,3 @@
-singleton Players Players.qml
 singleton Audio Audio.qml
 singleton Recorder Recorder.qml
 singleton Vpn Vpn.qml

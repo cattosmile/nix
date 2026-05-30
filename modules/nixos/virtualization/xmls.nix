@@ -271,7 +271,7 @@ let
   '';
 
   win10normalXml = pkgs.writeText "win10-normal.xml" ''
-    <domain type="kvm">
+    <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
       <name>win10-normal</name>
       <uuid>8f4e3c2b-1a0d-4e5f-8c7b-6a5d4e3f2c1b</uuid>
       <metadata>
@@ -281,6 +281,10 @@ let
       </metadata>
       <memory unit="KiB">8388608</memory>
       <currentMemory unit="KiB">8388608</currentMemory>
+      <memoryBacking>
+        <source type="memfd"/>
+        <access mode="shared"/>
+      </memoryBacking>
       <vcpu placement="static">4</vcpu>
       <os firmware="efi">
         <type arch="x86_64" machine="pc-q35-10.2">hvm</type>
@@ -359,19 +363,36 @@ let
         <channel type="spicevmc">
           <target type="virtio" name="com.redhat.spice.0"/>
         </channel>
-        <input type="tablet" bus="usb"/>
-        <input type="keyboard" bus="usb"/>
+        <input type="mouse" bus="virtio"/>
+        <input type="keyboard" bus="virtio"/>
         <graphics type="spice" autoport="yes" listen="127.0.0.1">
           <listen type="address" address="127.0.0.1"/>
           <image compression="off"/>
         </graphics>
         <sound model="ich9"/>
         <audio id="1" type="spice"/>
-        <video>
-          <model type="qxl" ram="65536" vram="65536" vgamem="16384" heads="1" primary="yes"/>
-        </video>
-        <memballoon model="virtio"/>
+        <hostdev mode="subsystem" type="pci" managed="yes">
+          <source>
+            <address domain="0x0000" bus="0x09" slot="0x00" function="0x0"/>
+          </source>
+        </hostdev>
+        <hostdev mode="subsystem" type="pci" managed="yes">
+          <source>
+            <address domain="0x0000" bus="0x09" slot="0x00" function="0x1"/>
+          </source>
+        </hostdev>
+        <memballoon model="none"/>
       </devices>
+      <qemu:commandline>
+        <qemu:arg value="-object"/>
+        <qemu:arg value="input-linux,id=mouse1,evdev=/dev/input/by-id/usb-Logitech_USB_Receiver-event-mouse"/>
+        <qemu:arg value="-object"/>
+        <qemu:arg value="input-linux,id=kbd1,evdev=/dev/input/by-id/usb-Lenovo_Lenovo_Traditional_USB_Keyboard-event-kbd,grab_all=on,repeat=on,grab-toggle=ctrl-ctrl"/>
+        <qemu:arg value="-device"/>
+        <qemu:arg value="{'driver':'ivshmem-plain','id':'shmem0','memdev':'looking-glass'}"/>
+        <qemu:arg value="-object"/>
+        <qemu:arg value="{'qom-type':'memory-backend-file','id':'looking-glass','mem-path':'/dev/kvmfr0','size':33554432,'share':true}"/>
+      </qemu:commandline>
     </domain>
   '';
 in

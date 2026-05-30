@@ -66,9 +66,23 @@ Singleton {
         }
     }
 
-    // Background sync to catch external changes.
+    // Event-driven: react to rfkill state changes instantly (same mechanism as
+    // Bluetooth). `rfkill event` streams every block/unblock — including those
+    // triggered by NetworkManager (`nmcli radio wifi off` soft-blocks via rfkill).
+    Process {
+        running: true
+        command: ["rfkill", "event"]
+        stdout: SplitParser {
+            onRead: root.refresh()
+        }
+        stderr: StdioCollector {
+            onStreamFinished: if (text.trim()) console.warn("Wifi rfkill event:", text.trim())
+        }
+    }
+
+    // Slow fallback in case an event is ever missed.
     Timer {
-        interval: 10000
+        interval: 30000
         running: true
         repeat: true
         onTriggered: root.refresh()
