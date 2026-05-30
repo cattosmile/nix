@@ -18,9 +18,9 @@ PanelWindow {
     anchors.bottom: true
 
     mask: Region {
-        x: root.expanded ? 0 : root.width - Theme.barWidth
+        x: root.width - root.visualWidth
         y: 0
-        width:  root.expanded ? root.width : Theme.barWidth
+        width:  root.visualWidth
         height: root.height
     }
 
@@ -32,6 +32,7 @@ PanelWindow {
 
     onVisualWidthChanged: {
         Theme.activeBarWidth = Math.max(Theme.barWidth, visualWidth)
+        Theme.exclusionBarWidth = visualWidth
     }
 
     onExpandedChanged: {
@@ -42,14 +43,6 @@ PanelWindow {
             expandAnim.stop()
             collapseAnim.start()
         }
-        exclusionTimer.restart()
-    }
-
-    // Deferred one tick so the animation starts before Hyprland repositions windows.
-    Timer {
-        id: exclusionTimer
-        interval: 0
-        onTriggered: Theme.exclusionBarWidth = root.expanded ? Theme.expandedWidth : Theme.barWidth
     }
 
     Timer {
