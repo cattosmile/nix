@@ -32,12 +32,13 @@ PanelWindow {
 
     onVisualWidthChanged: {
         Theme.activeBarWidth = Math.max(Theme.barWidth, visualWidth)
-        Theme.exclusionBarWidth = visualWidth
     }
 
     onExpandedChanged: {
         if (expanded) {
             collapseAnim.stop()
+            // Reserve space immediately so the bar grows into already-inset layout.
+            Theme.exclusionBarWidth = Theme.expandedWidth
             expandAnim.start()
         } else {
             expandAnim.stop()
@@ -69,6 +70,10 @@ PanelWindow {
         duration: 700
         easing.type:        Easing.BezierSpline
         easing.bezierCurve: [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
+        // Release reserved space after the bar finishes closing — avoids
+        // relayouting every animation frame while keeping windows out from
+        // under the bar during the visual shrink.
+        onFinished: Theme.exclusionBarWidth = Theme.barWidth
     }
 
     Rectangle {
