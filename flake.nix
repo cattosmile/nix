@@ -33,6 +33,10 @@
     };
     spicetify-nix.url = "github:Gerg-L/spicetify-nix";
     nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=latest";
+    sls-steam = {
+      url = "github:AceSLS/SLSsteam";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -59,7 +63,12 @@
           disko.nixosModules.disko
           {
             home-manager.sharedModules = [
-              ({ pkgs, ... }: { _module.args.unstable = pkgs.unstable; })
+              (
+                { pkgs, ... }:
+                {
+                  _module.args.unstable = pkgs.unstable;
+                }
+              )
               inputs.sops-nix.homeManagerModules.sops
               nix-flatpak.homeManagerModules.nix-flatpak
             ];

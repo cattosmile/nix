@@ -934,8 +934,29 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nur": "nur",
         "quickshell": "quickshell",
+        "sls-steam": "sls-steam",
         "sops-nix": "sops-nix",
         "spicetify-nix": "spicetify-nix"
+      }
+    },
+    "sls-steam": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1779974773,
+        "narHash": "sha256-/NdMwD6MOfg16+MhHYeDbThlgsl0Ui04daguc7OITDo=",
+        "owner": "AceSLS",
+        "repo": "SLSsteam",
+        "rev": "414a112981abb0cb9cd8788e4aaad76d813077e2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AceSLS",
+        "repo": "SLSsteam",
+        "type": "github"
       }
     },
     "sops-nix": {

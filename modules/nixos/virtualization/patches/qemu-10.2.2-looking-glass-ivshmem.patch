@@ -1,0 +1,22 @@
+diff --git a/hw/misc/ivshmem-pci.c b/hw/misc/ivshmem-pci.c
+--- a/hw/misc/ivshmem-pci.c
++++ b/hw/misc/ivshmem-pci.c
+@@ -40,7 +40,8 @@
+ #include "hw/misc/ivshmem.h"
+ #include "qom/object.h"
+ 
+-#define PCI_VENDOR_ID_IVSHMEM   PCI_VENDOR_ID_REDHAT_QUMRANET
++/* Looking Glass / Windows ivshmem driver requires Red Hat PCI IDs. */
++#define PCI_VENDOR_ID_IVSHMEM   0x1af4
+ #define PCI_DEVICE_ID_IVSHMEM   0x1110
+ 
+ #define IVSHMEM_MAX_PEERS UINT16_MAX
+@@ -1000,6 +1001,8 @@ static void ivshmem_common_class_init(ObjectClass *klass, const void *data)
+     k->config_write = ivshmem_write_config;
+     k->vendor_id = PCI_VENDOR_ID_IVSHMEM;
+     k->device_id = PCI_DEVICE_ID_IVSHMEM;
++    k->subsystem_vendor_id = 0x1af4;
++    k->subsystem_id = 0x1100;
+     k->class_id = PCI_CLASS_MEMORY_RAM;
+     k->revision = 1;
+     device_class_set_legacy_reset(dc, ivshmem_reset);

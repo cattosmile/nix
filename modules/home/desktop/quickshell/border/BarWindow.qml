@@ -111,13 +111,13 @@ PanelWindow {
                 anchors.verticalCenter:   parent.verticalCenter
             }
 
-            // Dummy button: toggles the centered popup rectangle.
+            // Dummy button: each tap pushes a new notification onto the stack.
             Rectangle {
                 id: popupButton
                 width:  Theme.islandWidth
                 height: Theme.islandWidth
                 radius: width / 2
-                color:  root.barState.centerPopupVisible ? Theme.islandActive : Theme.islandBg
+                color:  popupTap.pressed ? Theme.islandActive : Theme.islandBg
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom:           workspaceSwitcher.top
                 anchors.bottomMargin:     12
@@ -127,14 +127,21 @@ PanelWindow {
                 Text {
                     anchors.centerIn: parent
                     text:  "+"
-                    color: root.barState.centerPopupVisible ? Theme.islandBg : Theme.islandActive
+                    color: popupTap.pressed ? Theme.islandBg : Theme.islandActive
                     font.pixelSize: 20
                 }
 
                 HoverHandler { cursorShape: Qt.PointingHandCursor }
 
                 TapHandler {
-                    onTapped: root.barState.centerPopupVisible = !root.barState.centerPopupVisible
+                    id: popupTap
+                    onTapped: root.barState.pushNotification(
+                        -1,
+                        "Discord",
+                        "Fick Kimi",
+                        "Hey! Did you see my last message? 👀 I pushed the new build and the notification stack finally looks clean — wanna hop on call later?",
+                        "",
+                        true)
                 }
             }
 

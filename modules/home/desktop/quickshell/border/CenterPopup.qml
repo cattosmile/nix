@@ -1,19 +1,21 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
 
-// Full-screen overlay; a red block hangs from the top bar. The upper corners
-// flare outward with a tangent fillet (radius = Theme.innerRadius, matching the
-// border's inner corners) so the block looks like it grows out of the border.
+// Full-screen overlay that renders the notification stack. Each entry in
+// barState.notifications becomes one block that slides down into place from above
+// the top border (as if coming in from outside the monitor), lives for ~5s, then
+// retracts left-to-right into the bar and removes itself. Entries are appended, and
+// since every block shares the same rest position the newest is simply drawn on top.
 PanelWindow {
     id: root
 
     required property BarState barState
 
-    // Stay mapped while the block is still unrolling / retracting.
-    visible: barState.centerPopupVisible || (content.blockH > 0 && content.leftX < content.brX)
+    visible: barState.notifications.count > 0
     color:   "transparent"
 
     WlrLayershell.layer:         WlrLayer.Top
@@ -26,136 +28,239 @@ PanelWindow {
     anchors.left:   true
     anchors.right:  true
 
+    // Notifications are non-interactive — let clicks pass through the overlay.
+    mask: Region {}
+
     readonly property color blockColor: Theme.frameColor
     readonly property real  fillet:     Theme.innerRadius
     readonly property real  bodyW:      400
     readonly property real  bodyH:      125
 
-    // Shared bar-style motion (slowed for screenshots).
-    readonly property int animDuration: 8000
-    readonly property var animCurve:    [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
+    // Avatar (dummy profile picture) — left-side counterpart to the text. Sized so
+    // its top, left and bottom gaps are all equal to avatarMargin.
+    readonly property real avatarMargin: Theme.frameThickness
+    readonly property real avatarSize:   bodyH - 2 * avatarMargin
 
-    mask: Region { item: content }
+    // Shared bar-style motion.
+    readonly property int  notifLifetime: 5000   // how long a notification stays before auto-retracting
+    readonly property int  animDuration:  700
+    readonly property var  animCurve:     [0.16, 1.0, 0.3, 1.0, 1.0, 1.0]
 
-    // Window ignores exclusion zones (full-screen, fixed), so fixed margins keep
-    // the block anchored to the screen — it won't follow the bar as it expands.
+    // Stack container fixed to the top-right, nudged down by one border thickness so
+    // the block's top-left fillet meets the border's inner edge cleanly. Shares the
+    // Top layer with the border but is instantiated after it, so it draws on top.
     Item {
-        id: content
         anchors.right:       parent.right
         anchors.rightMargin: Theme.barWidth
         anchors.top:         parent.top
         anchors.topMargin:   Theme.frameThickness
-        implicitWidth:  root.bodyW + root.fillet
-        implicitHeight: blockH + root.fillet
+        anchors.bottom:      parent.bottom
+        width:               root.bodyW + root.fillet
 
-        // blockH: vertical unroll amount (0..bodyH), used by the IN animation.
-        // leftX:  body left-edge x; the OUT animation retracts it toward the docked
-        //         right edge (brX). The right + top edges always stay docked to the
-        //         bars, so every corner stays attached and valid.
-        // IN  → unroll top-to-bottom (grow blockH, leftX stays at fillet).
-        // OUT → retract left-to-right (leftX → brX, width shrinks into the bar),
-        //       then reset blockH/leftX off-screen so the next open unrolls fresh.
-        property real blockH: 0
-        property real leftX:  root.fillet
+        Repeater {
+            model: root.barState.notifications
 
-        state: root.barState.centerPopupVisible ? "open" : "closed"
-        states: [
-            State {
-                name: "open"
-                PropertyChanges { target: content; blockH: root.bodyH; leftX: root.fillet }
-            },
-            State {
-                name: "closed"
-                PropertyChanges { target: content; blockH: 0; leftX: root.fillet }
-            }
-        ]
-        transitions: [
-            Transition {
-                from: "closed"; to: "open"
+            delegate: Item {
+                id: block
+
+                required property int    notifId
+                required property string  app
+                required property string  username
+                required property string  preview
+                required property string  image
+                required property bool    circle
+
+                width:  root.bodyW + root.fillet
+                height: root.bodyH + root.fillet
+
+                // All blocks share the same rest position; the newest (appended last,
+                // drawn last) stacks on top. On open the block slides DOWN into place
+                // from above the screen edge, fully formed — so it reads as coming in
+                // from outside the monitor, with no corner deformation and no gap.
+                y: slideY
+
+                // slideY: vertical slide offset — starts fully above the screen and
+                //         animates to 0 (rest) on open.
+                // leftX:  body left edge; OUT retracts it to brX so the block shrinks
+                //         into the bar before removal.
+                property real slideY: -(root.bodyH + root.fillet + Theme.frameThickness)
+                property real leftX:  root.fillet
+
+                readonly property real brX:  root.fillet + root.bodyW
+                readonly property real curW: brX - leftX
+
+                // Corner radii — full at rest, capped only by the current width so they
+                // collapse cleanly as the block retracts into the bar on OUT.
+                readonly property real frRight: Math.min(root.fillet, curW)
+                readonly property real bl:      Math.max(0, Math.min(root.fillet, curW - frRight))
+                readonly property real frLeft:  Math.min(root.fillet, curW)
+
+                // IN: slide down from above the screen into the rest position.
+                NumberAnimation {
+                    id: inAnim
+                    target: block; property: "slideY"; to: 0
+                    duration:           root.animDuration
+                    easing.type:        Easing.BezierSpline
+                    easing.bezierCurve: root.animCurve
+                }
+
+                // OUT: retract left-to-right, then drop the entry from the model.
                 SequentialAnimation {
-                    PropertyAction { target: content; property: "leftX"; value: root.fillet }
+                    id: outAnim
                     NumberAnimation {
-                        target: content; property: "blockH"; to: root.bodyH
+                        target: block; property: "leftX"; to: block.brX
                         duration:           root.animDuration
                         easing.type:        Easing.BezierSpline
                         easing.bezierCurve: root.animCurve
                     }
+                    ScriptAction { script: root.barState.removeNotification(block.notifId) }
                 }
-            },
-            Transition {
-                from: "open"; to: "closed"
-                SequentialAnimation {
-                    NumberAnimation {
-                        target: content; property: "leftX"; to: content.brX
-                        duration:           root.animDuration
-                        easing.type:        Easing.BezierSpline
-                        easing.bezierCurve: root.animCurve
+
+                Timer {
+                    interval: root.notifLifetime
+                    running:  true
+                    onTriggered: outAnim.start()
+                }
+
+                Component.onCompleted: inAnim.start()
+
+                // Whole block as ONE continuous, always full-size outline — corners
+                // never deform, so the top-left fillet always meets the border (no gap).
+                Shape {
+                    width:  block.width
+                    height: block.height
+                    preferredRendererType: Shape.CurveRenderer
+
+                    ShapePath {
+                        fillColor:   root.blockColor
+                        strokeColor: "transparent"
+                        strokeWidth: 0
+
+                        startX: block.leftX - block.frLeft
+                        startY: 0
+
+                        PathLine { x: block.brX;                 y: 0 }
+                        PathLine { x: block.brX;                 y: root.bodyH + block.frRight }
+                        PathArc  { x: block.brX - block.frRight; y: root.bodyH
+                                   radiusX: block.frRight; radiusY: block.frRight
+                                   direction: PathArc.Counterclockwise }
+                        PathLine { x: block.leftX + block.bl;    y: root.bodyH }
+                        PathArc  { x: block.leftX;               y: root.bodyH - block.bl
+                                   radiusX: block.bl; radiusY: block.bl
+                                   direction: PathArc.Clockwise }
+                        PathLine { x: block.leftX;               y: block.frLeft }
+                        PathArc  { x: block.leftX - block.frLeft; y: 0
+                                   radiusX: block.frLeft; radiusY: block.frLeft
+                                   direction: PathArc.Counterclockwise }
                     }
-                    PropertyAction { target: content; property: "blockH"; value: 0 }
-                    PropertyAction { target: content; property: "leftX";  value: root.fillet }
                 }
-            }
-        ]
 
-        // Body spans x ∈ [leftX, brX], y ∈ [0, blockH]; right edge docked to the bar.
-        readonly property real brX:  root.fillet + root.bodyW   // body right edge
-        readonly property real curW: brX - leftX                // current body width
+                // Content clipped to the body box; horizontally it rides the left edge
+                // into the bar on OUT. It's centred and slides in with the block.
+                Item {
+                    x:      block.leftX
+                    y:      0
+                    width:  block.curW
+                    height: root.bodyH
+                    clip:   true
 
-        // Corner radii, capped so adjacent corners never overlap on a shared edge
-        // as the block unrolls (height) or retracts (width). Same scaling idea as
-        // the top fix, now also covering the bottom-left as the block narrows out.
-        readonly property real frRight: Math.min(root.fillet, curW)                                 // bottom-right flare
-        readonly property real bl:      Math.max(0, Math.min(root.fillet, blockH / 2, curW - frRight)) // bottom-left round
-        readonly property real frLeft:  Math.min(root.fillet, blockH / 2, curW)                     // top-left flare
+                    Item {
+                        id: avatar
 
-        // Whole block (body + top-left flare + bottom-right flare + bottom-left
-        // round) as ONE continuous outline — no seam between separate primitives.
-        Shape {
-            anchors.fill: parent
-            preferredRendererType: Shape.CurveRenderer
+                        x:      root.avatarMargin
+                        y:      (root.bodyH - root.avatarSize) / 2
+                        width:  root.avatarSize
+                        height: root.avatarSize
 
-            ShapePath {
-                fillColor:   root.blockColor
-                strokeColor: "transparent"
-                strokeWidth: 0
+                        // Circle for Discord (its avatar is pre-masked round), rounded
+                        // square for everything else (Spotify, …) which send full squares.
+                        // A radius/clip alone does NOT round a child Image's corners, so
+                        // the image is masked explicitly below via MultiEffect.
+                        readonly property real radius: block.circle ? width / 2 : (Theme.innerRadius - root.avatarMargin)
 
-                // Top-left flare tip, on the bar.
-                startX: content.leftX - content.frLeft
-                startY: 0
+                        // Fallback background + "?" shown while the image loads or is
+                        // missing; matches the masked image's rounded shape.
+                        Rectangle {
+                            anchors.fill: parent
+                            radius:  avatar.radius
+                            color:   Theme.islandBg
+                            visible: avatarImg.status !== Image.Ready
 
-                PathLine { x: content.brX;                   y: 0 }                               // top edge
-                PathLine { x: content.brX;                   y: content.blockH + content.frRight } // right edge + flare drop
-                PathArc  { x: content.brX - content.frRight; y: content.blockH                     // bottom-right flare
-                           radiusX: content.frRight; radiusY: content.frRight
-                           direction: PathArc.Counterclockwise }
-                PathLine { x: content.leftX + content.bl;    y: content.blockH }                  // bottom edge
-                PathArc  { x: content.leftX;                 y: content.blockH - content.bl       // bottom-left round
-                           radiusX: content.bl; radiusY: content.bl
-                           direction: PathArc.Clockwise }
-                PathLine { x: content.leftX;                 y: content.frLeft }                  // left edge
-                PathArc  { x: content.leftX - content.frLeft; y: 0                                // top-left flare
-                           radiusX: content.frLeft; radiusY: content.frLeft
-                           direction: PathArc.Counterclockwise }
-            }
-        }
+                            Text {
+                                anchors.centerIn: parent
+                                text:  "?"
+                                color: Theme.islandMuted
+                                font.pixelSize: parent.width * 0.5
+                                font.bold: true
+                            }
+                        }
 
-        // Text clipped to the current body box. It's glued to the body geometry so
-        // it travels 1:1 with the animation: horizontally it sits at a fixed offset
-        // from the (moving) left edge, so it tracks leftX at full speed on OUT;
-        // vertically it tracks the current height, so it rides down as it extends on IN.
-        Item {
-            x:      content.leftX
-            y:      0
-            width:  content.curW
-            height: content.blockH
-            clip:   true
+                        // Sender's image (e.g. Discord avatar / Spotify art), masked to
+                        // `avatar.radius` so its corners are actually rounded.
+                        Image {
+                            id: avatarImg
+                            anchors.fill:      parent
+                            source:            block.image ? Qt.resolvedUrl(block.image) : ""
+                            fillMode:          Image.PreserveAspectCrop
+                            sourceSize.width:  root.avatarSize
+                            sourceSize.height: root.avatarSize
+                            cache:             false
+                            asynchronous:      true
+                            visible:           status === Image.Ready
+                            layer.enabled:     true
+                            layer.effect: MultiEffect {
+                                maskEnabled: true
+                                maskSource:  avatarMask
+                            }
+                        }
 
-            Text {
-                x:     root.bodyW / 2 - width / 2                 // centred on the full body, tracks left edge
-                y:     content.blockH - root.bodyH / 2 - height / 2  // fixed offset from the moving bottom edge
-                text:  "Fick Kimi"
-                color: Theme.text
-                font.pixelSize: 24
+                        // Mask: a white rounded rect whose alpha cuts the image corners.
+                        Item {
+                            id: avatarMask
+                            anchors.fill:  avatar
+                            layer.enabled: true
+                            visible:       false
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius:       avatar.radius
+                                antialiasing: true
+                            }
+                        }
+                    }
+
+                    // Username + message preview, stacked to the right of the avatar.
+                    Column {
+                        readonly property real leftPad:  root.avatarMargin + root.avatarSize + 16
+                        readonly property real rightPad: 16
+
+                        x:       leftPad
+                        y:       (root.bodyH - height) / 2
+                        width:   root.bodyW - leftPad - rightPad
+                        spacing: 10
+
+                        Text {
+                            width: parent.width
+                            text:  block.app + " | " + block.username
+                            color: Theme.notifUsername
+                            font.family: "Iosevka"
+                            font.pixelSize: 18
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width:           parent.width
+                            text:            block.preview
+                            color:           Theme.notifPreview
+                            font.family:     "Iosevka"
+                            font.pixelSize:  14
+                            wrapMode:        Text.Wrap
+                            maximumLineCount: 2
+                            elide:           Text.ElideRight
+                        }
+                    }
+                }
             }
         }
     }

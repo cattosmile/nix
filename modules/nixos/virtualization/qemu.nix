@@ -1,12 +1,15 @@
 { pkgs, ... }:
 
+let
+  qemu_kvm = import ./qemu-kvm-anti-detection.nix pkgs;
+in
 {
   programs.virt-manager.enable = true;
 
   virtualisation.libvirtd = {
     enable = true;
     qemu = {
-      package = pkgs.qemu_kvm;
+      package = qemu_kvm;
       runAsRoot = true;
       swtpm.enable = true;
     };

@@ -1,65 +1,76 @@
 pragma Singleton
-pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
 
-// Notification daemon. Wraps Quickshell's NotificationServer (an implementation
-// of the freedesktop Desktop Notifications spec) and exposes:
-//   - `popups`: notifications currently shown as transient on-screen toasts.
-//   - `list`:   every notification still tracked by the server (history).
-// The toast UI lives in border/NotificationPopups.qml; each card holds a
-// RetainableLock on its notification so it can play an exit animation even if
-// the sending app closes the notification first.
+// Freedesktop / libnotify notification server. Quickshell becomes the system's
+// notification daemon while the shell is running, so any app that sends a
+// desktop notification (Discord, Spotify, …) lands here.
+//
+// We must set `tracked = true` on each notification, otherwise the server
+// discards it as soon as onNotification returns — and with it the image data
+// (e.g. a profile picture, served via an internal image provider), which would
+// then fail to load. We keep tracked objects alive until the popup that
+// displays them retracts, at which point BarState calls release().
+//
+// Shape note: Discord pre-masks the avatar it sends into a CIRCLE (transparent
+// corners), so it can only ever look right as a circle. Other apps (Spotify, …)
+// send a full square. We flag Discord so the popup renders it circular and
+// everything else as a rounded square.
 Singleton {
     id: root
 
-    // Active toasts, newest first. Each entry is a Notification object.
-    property list<var> popups: []
-    // Everything the server is still tracking, newest first (notification center).
-    readonly property var list: server.trackedNotifications
+    // Emitted once per incoming notification. id is the server-assigned id used
+    // later to release()/dismiss the tracked notification. circle = render the
+    // avatar as a circle (Discord) rather than a rounded square.
+    signal notify(int id, string app, string summary, string body, string image, bool circle)
 
-    property bool dnd: false
+    // Live tracked notifications, keyed by id, kept alive for their image data.
+    property var tracked: ({})
 
-    // Drop a toast from the on-screen stack but leave it tracked by the server
-    // (so it survives in the notification history). Used on timeout / hover-out.
-    function dismissPopup(notif): void {
-        root.popups = root.popups.filter(n => n !== notif);
+    // Title-case the freedesktop app name (e.g. "discord" -> "Discord").
+    function prettifyApp(name) {
+        if (!name)
+            return "Notification";
+        return name.charAt(0).toUpperCase() + name.slice(1);
     }
 
-    // Fully close a notification: remove the toast and hint the sending app that
-    // the user explicitly dismissed it. Used on click / "X".
-    function close(notif): void {
-        root.popups = root.popups.filter(n => n !== notif);
-        if (notif)
-            notif.dismiss();
-    }
-
-    function clearAll(): void {
-        root.popups = [];
-        for (const notif of [...server.trackedNotifications.values])
-            notif.dismiss();
+    // Stop tracking a notification and tell the server it's been dismissed.
+    function release(id) {
+        const n = root.tracked[id];
+        if (n) {
+            delete root.tracked[id];
+            n.dismiss();
+        }
     }
 
     NotificationServer {
         id: server
 
-        keepOnReload:            false
-        actionsSupported:        true
-        actionIconsSupported:    true
-        bodyHyperlinksSupported: true
-        bodyImagesSupported:     true
-        bodyMarkupSupported:     true
-        imageSupported:          true
-        persistenceSupported:    true
+        keepOnReload:    false
+        actionsSupported: false
+        bodyMarkupSupported: true
+        imageSupported:  true
 
         onNotification: notif => {
-            // Keep it alive past this signal handler so it can be tracked / shown.
             notif.tracked = true;
+            root.tracked[notif.id] = notif;
 
-            if (!root.dnd)
-                root.popups = [notif, ...root.popups];
+            // Prefer the notification's own image (profile picture); fall back to
+            // the app's themed icon if it provides no image.
+            let img = notif.image;
+            if (!img && notif.appIcon)
+                img = Quickshell.iconPath(notif.appIcon, true);
+
+            const isDiscord = (notif.appName || "").toLowerCase() === "discord";
+
+            root.notify(notif.id,
+                        root.prettifyApp(notif.appName),
+                        notif.summary,
+                        notif.body,
+                        img || "",
+                        isDiscord);
         }
     }
 }

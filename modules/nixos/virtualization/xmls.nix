@@ -262,10 +262,10 @@ let
         <qemu:arg value="input-linux,id=mouse1,evdev=/dev/input/by-id/usb-Logitech_USB_Receiver-event-mouse"/>
         <qemu:arg value="-object"/>
         <qemu:arg value="input-linux,id=kbd1,evdev=/dev/input/by-id/usb-Lenovo_Lenovo_Traditional_USB_Keyboard-event-kbd,grab_all=on,repeat=on,grab-toggle=ctrl-ctrl"/>
-        <qemu:arg value="-device"/>
-        <qemu:arg value="{'driver':'ivshmem-plain','id':'shmem0','memdev':'looking-glass'}"/>
         <qemu:arg value="-object"/>
         <qemu:arg value="{'qom-type':'memory-backend-file','id':'looking-glass','mem-path':'/dev/kvmfr0','size':33554432,'share':true}"/>
+        <qemu:arg value="-device"/>
+        <qemu:arg value="{'driver':'ivshmem-plain','id':'shmem0','memdev':'looking-glass'}"/>
       </qemu:commandline>
     </domain>
   '';
