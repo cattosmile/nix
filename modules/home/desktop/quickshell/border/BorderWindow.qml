@@ -10,7 +10,9 @@ PanelWindow {
     id: root
 
     required property BarState barState
+    required property bool hasFullscreen
 
+    visible: !hasFullscreen
     color: "transparent"
 
     WlrLayershell.layer:         WlrLayer.Top

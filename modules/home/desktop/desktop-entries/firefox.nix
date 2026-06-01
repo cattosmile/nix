@@ -2,22 +2,13 @@
 
 {
   xdg.desktopEntries = {
-    firefox-gemini = {
-      name = "Gemini";
-      genericName = "Gemini";
+    firefox-ai = {
+      name = "AI";
+      genericName = "AI";
       icon = "firefox";
-      exec = "firefox -P Gemini";
+      exec = "firefox -P AI";
       terminal = false;
-      comment = "Firefox Gemini Profile";
-    };
-
-    firefox-claude = {
-      name = "Claude";
-      genericName = "Claude";
-      icon = "firefox";
-      exec = "firefox -P Claude";
-      terminal = false;
-      comment = "Firefox Claude Profile";
+      comment = "Firefox AI Profile";
     };
 
     firefox-roblox = {

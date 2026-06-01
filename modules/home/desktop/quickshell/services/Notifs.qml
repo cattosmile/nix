@@ -12,7 +12,9 @@ import Quickshell.Services.Notifications
 // discards it as soon as onNotification returns — and with it the image data
 // (e.g. a profile picture, served via an internal image provider), which would
 // then fail to load. We keep tracked objects alive until the popup that
-// displays them retracts, at which point BarState calls release().
+// displays them retracts, at which point BarState calls release(). If the app
+// expires or closes the notification earlier, `closed` drops it from `tracked`
+// so release() does not touch a destroyed object.
 //
 // Shape note: Discord pre-masks the avatar it sends into a CIRCLE (transparent
 // corners), so it can only ever look right as a circle. Other apps (Spotify, …)
@@ -36,13 +38,19 @@ Singleton {
         return name.charAt(0).toUpperCase() + name.slice(1);
     }
 
-    // Stop tracking a notification and tell the server it's been dismissed.
+    function untrack(id) {
+        delete root.tracked[id];
+    }
+
+    // Called when the popup retracts. Untrack first so a concurrent `closed`
+    // handler cannot race; only clear `tracked` if the server object is still alive.
     function release(id) {
         const n = root.tracked[id];
-        if (n) {
-            delete root.tracked[id];
-            n.dismiss();
-        }
+        if (n === undefined)
+            return;
+        root.untrack(id);
+        if (n.tracked)
+            n.tracked = false;
     }
 
     NotificationServer {
@@ -56,6 +64,7 @@ Singleton {
         onNotification: notif => {
             notif.tracked = true;
             root.tracked[notif.id] = notif;
+            notif.closed.connect(() => root.untrack(notif.id));
 
             // Prefer the notification's own image (profile picture); fall back to
             // the app's themed icon if it provides no image.

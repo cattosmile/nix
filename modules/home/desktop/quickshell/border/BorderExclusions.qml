@@ -10,24 +10,25 @@ Scope {
 
     required property ShellScreen screen
     required property BarState barState
+    required property bool hasFullscreen
 
     ExclusionZone {
         anchors.top:   true
-        exclusiveZone: Theme.frameThickness
+        exclusiveZone: root.hasFullscreen ? 0 : Theme.frameThickness
         implicitWidth: 1
         implicitHeight: Theme.frameThickness
     }
 
     ExclusionZone {
         anchors.bottom: true
-        exclusiveZone:  Theme.frameThickness
+        exclusiveZone:  root.hasFullscreen ? 0 : Theme.frameThickness
         implicitWidth:  1
         implicitHeight: Theme.frameThickness
     }
 
     ExclusionZone {
         anchors.left:   true
-        exclusiveZone:  Theme.frameThickness
+        exclusiveZone:  root.hasFullscreen ? 0 : Theme.frameThickness
         implicitWidth:  Theme.frameThickness
         implicitHeight: 1
     }
@@ -36,7 +37,7 @@ Scope {
     // so Hyprland layout updates don't also resize this PanelWindow every frame.
     ExclusionZone {
         anchors.right:  true
-        exclusiveZone:  root.barState.exclusionBarWidth
+        exclusiveZone:  root.hasFullscreen ? 0 : root.barState.exclusionBarWidth
         implicitWidth:  1
         implicitHeight: 1
     }

@@ -442,18 +442,18 @@ in
         };
       };
       # ------------------------------------------------------------------------------------
-      # Claude
+      # AI
       # ------------------------------------------------------------------------------------
 
-      claude = {
+      ai = {
         id = 4;
-        name = "Claude";
+        name = "AI";
         extensions.packages = with pkgs.nur.repos.rycee.firefox-addons; [
           ublock-origin
           bitwarden
         ];
         settings = commonSettings // {
-          "browser.startup.homepage" = "https://claude.ai/new";
+          "browser.startup.homepage" = "about:blank";
 
           "browser.uiCustomization.state" = builtins.toJSON {
             currentVersion = 20;
@@ -491,12 +491,32 @@ in
                   url = "https://claude.ai/new";
                 }
                 {
-                  name = "Claude Incognito";
-                  url = "https://claude.ai/new?incognito";
-                }
-                {
                   name = "Claude Usage";
                   url = "https://claude.ai/settings/usage";
+                }
+                {
+                  name = "Kimi";
+                  url = "https://www.kimi.com/";
+                }
+                {
+                  name = "Kimi Usage";
+                  url = "https://www.kimi.com/code/console";
+                }
+                {
+                  name = "ChatGPT";
+                  url = "https://chatgpt.com/";
+                }
+                {
+                  name = "ChatGPT Usage (Not working)";
+                  url = "https://chatgpt.com/";
+                }
+                {
+                  name = "Gemini";
+                  url = "https://gemini.google.com/";
+                }
+                {
+                  name = "ChatGPT Usage (Not working)";
+                  url = "https://gemini.google.com/usage";
                 }
               ];
             }

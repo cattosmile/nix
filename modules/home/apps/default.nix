@@ -11,5 +11,6 @@
     ./looking-glass
     ./spicetify
     ./flatpak
+    ./codex
   ];
 }

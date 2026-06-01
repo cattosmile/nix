@@ -7,7 +7,9 @@ PanelWindow {
     id: root
 
     required property BarState barState
+    required property bool hasFullscreen
 
+    visible: !hasFullscreen
     color: "transparent"
 
     WlrLayershell.layer:         WlrLayer.Overlay
@@ -31,6 +33,20 @@ PanelWindow {
     property bool isToggling:  false
 
     implicitWidth: Theme.expandedWidth
+
+    onHasFullscreenChanged: {
+        if (hasFullscreen) {
+            if (expanded)
+                expanded = false;
+            expandAnim.stop();
+            collapseAnim.stop();
+            visualWidth = Theme.barWidth;
+            barState.exclusionBarWidth = 0;
+            barState.activeBarWidth = Theme.barWidth;
+        } else {
+            barState.exclusionBarWidth = expanded ? Theme.expandedWidth : Theme.barWidth;
+        }
+    }
 
     onVisualWidthChanged: {
         // Frame hole tracks the visible bar; exclusion is committed once per toggle.

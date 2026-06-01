@@ -4,6 +4,7 @@ import QtQuick.Effects
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Wayland
+import "../services"
 
 // Full-screen overlay that renders the notification stack. Each entry in
 // barState.notifications becomes one block that slides down into place from above
@@ -91,8 +92,12 @@ PanelWindow {
 
                 // Corner radii — full at rest, capped only by the current width so they
                 // collapse cleanly as the block retracts into the bar on OUT.
+                // Discord: bottom-left follows the circular avatar (+6px ≈ half margin + 1px).
                 readonly property real frRight: Math.min(root.fillet, curW)
-                readonly property real bl:      Math.max(0, Math.min(root.fillet, curW - frRight))
+                readonly property real blRadius:  block.circle
+                    ? (root.avatarSize / 2 + 6)
+                    : root.fillet
+                readonly property real bl:      Math.max(0, Math.min(blRadius, curW - frRight))
                 readonly property real frLeft:  Math.min(root.fillet, curW)
 
                 // IN: slide down from above the screen into the rest position.
@@ -177,22 +182,37 @@ PanelWindow {
                         // A radius/clip alone does NOT round a child Image's corners, so
                         // the image is masked explicitly below via MultiEffect.
                         readonly property real radius: block.circle ? width / 2 : (Theme.innerRadius - root.avatarMargin)
+                        readonly property bool discordLogo: block.circle && Recorder.recording
 
-                        // Fallback background + "?" shown while the image loads or is
-                        // missing; matches the masked image's rounded shape.
                         Rectangle {
                             anchors.fill: parent
                             radius:  avatar.radius
                             color:   Theme.islandBg
-                            visible: avatarImg.status !== Image.Ready
+                        }
 
-                            Text {
-                                anchors.centerIn: parent
-                                text:  "?"
-                                color: Theme.islandMuted
-                                font.pixelSize: parent.width * 0.5
-                                font.bold: true
+                        // Screenshare: bundled Discord app icon, clipped to a circle.
+                        Image {
+                            id: discordLogoImg
+                            anchors.fill: parent
+                            visible: avatar.discordLogo
+                            source: Quickshell.shellPath("assets/discord.png")
+                            fillMode: Image.PreserveAspectCrop
+                            smooth: true
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                maskEnabled: true
+                                maskSource:  avatarMask
                             }
+                        }
+
+                        // Fallback "?" while the image loads or is missing.
+                        Text {
+                            anchors.centerIn: parent
+                            visible: !avatar.discordLogo && avatarImg.status !== Image.Ready
+                            text: "?"
+                            color: Theme.islandMuted
+                            font.pixelSize: avatar.width * 0.5
+                            font.bold: true
                         }
 
                         // Sender's image (e.g. Discord avatar / Spotify art), masked to
@@ -206,7 +226,7 @@ PanelWindow {
                             sourceSize.height: root.avatarSize
                             cache:             false
                             asynchronous:      true
-                            visible:           status === Image.Ready
+                            visible:           !avatar.discordLogo && status === Image.Ready
                             layer.enabled:     true
                             layer.effect: MultiEffect {
                                 maskEnabled: true
@@ -233,20 +253,42 @@ PanelWindow {
                     Column {
                         readonly property real leftPad:  root.avatarMargin + root.avatarSize + 16
                         readonly property real rightPad: 16
+                        readonly property bool privacyBlur: block.circle && Recorder.recording
 
                         x:       leftPad
                         y:       (root.bodyH - height) / 2
                         width:   root.bodyW - leftPad - rightPad
                         spacing: 10
 
-                        Text {
+                        Row {
                             width: parent.width
-                            text:  block.app + " | " + block.username
-                            color: Theme.notifUsername
-                            font.family: "Iosevka"
-                            font.pixelSize: 18
-                            font.bold: true
-                            elide: Text.ElideRight
+                            spacing: 0
+
+                            Text {
+                                id: appLabel
+                                text: block.app + " | "
+                                color: Theme.notifUsername
+                                font.family: "Iosevka"
+                                font.pixelSize: 18
+                                font.bold: true
+                            }
+
+                            Text {
+                                width: Math.max(0, parent.width - appLabel.width)
+                                text: block.username
+                                color: Theme.notifUsername
+                                font.family: "Iosevka"
+                                font.pixelSize: 18
+                                font.bold: true
+                                elide: Text.ElideRight
+
+                                layer.enabled: parent.parent.privacyBlur
+                                layer.effect: MultiEffect {
+                                    blurEnabled: true
+                                    blur: 1
+                                    blurMax: 40
+                                }
+                            }
                         }
 
                         Text {
@@ -258,6 +300,13 @@ PanelWindow {
                             wrapMode:        Text.Wrap
                             maximumLineCount: 2
                             elide:           Text.ElideRight
+
+                            layer.enabled: parent.privacyBlur
+                            layer.effect: MultiEffect {
+                                blurEnabled: true
+                                blur: 1
+                                blurMax: 28
+                            }
                         }
                     }
                 }
