@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 let
   patchedTokyonight = pkgs.tokyonight-gtk-theme.overrideAttrs (oldAttrs: {
@@ -15,6 +15,7 @@ in
       name = "Tokyonight-Dark";
       package = patchedTokyonight;
     };
+    gtk4.theme = config.gtk.theme;
     iconTheme = {
       name = "Papirus-Dark";
       package = pkgs.papirus-icon-theme;

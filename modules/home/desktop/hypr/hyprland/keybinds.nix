@@ -1,4 +1,4 @@
-{ ... }:
+{ lib, ... }:
 
 # let
 #   gameModeKill = pkgs.writeShellScriptBin "gamemode-kill" ''
@@ -22,58 +22,42 @@
 
 {
   wayland.windowManager.hyprland.settings = {
-    "$mainMod" = "SUPER";
-
     bind = [
       # Screenshots
-      "$mainMod SHIFT, S, exec, grim -g \"\$(slurp -w 0)\" - | wl-copy"
-      "$mainMod SHIFT, E, exec, wl-paste | swappy -f -"
+      { _args = [ "SUPER + SHIFT + S" (lib.generators.mkLuaInline ''hl.dsp.exec_cmd([[grim -g "$(slurp -w 0)" - | wl-copy]])'') ]; }
+      { _args = [ "SUPER + SHIFT + E" (lib.generators.mkLuaInline ''hl.dsp.exec_cmd([[wl-paste | swappy -f -]])'') ]; }
 
       # Programs
-      "$mainMod, RETURN, exec, $terminal"
-      "$mainMod, E, exec, [float;center;size 1000 600;monitor DP-1] $fileManager"
-      "$mainMod, SPACE, exec, $menu"
+      { _args = [ "SUPER + RETURN" (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("alacritty --title alacritty_float")'') ]; }
+      { _args = [ "SUPER + E" (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("nemo", { float = true, center = true, size = "1000 600", monitor = "DP-1" })'') ]; }
+      { _args = [ "SUPER + SPACE" (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("wofi --show drun")'') ]; }
 
       # Window Management
-      "$mainMod, Q, killactive,"
-      "$mainMod, M, exit"
-      "$mainMod, V, togglefloating,"
-      "$mainMod, J, layoutmsg, togglesplit"
-      "$mainMod, F, fullscreen,"
+      { _args = [ "SUPER + Q" (lib.generators.mkLuaInline "hl.dsp.window.close()") ]; }
+      { _args = [ "SUPER + M" (lib.generators.mkLuaInline "hl.dsp.exit()") ]; }
+      { _args = [ "SUPER + V" (lib.generators.mkLuaInline ''hl.dsp.window.float({ action = "toggle" })'') ]; }
+      { _args = [ "SUPER + J" (lib.generators.mkLuaInline ''hl.dsp.layout("togglesplit")'') ]; }
+      { _args = [ "SUPER + F" (lib.generators.mkLuaInline "hl.dsp.window.fullscreen()") ]; }
 
-      "$mainMod, left, movefocus, l"
-      "$mainMod, right, movefocus, r"
-      "$mainMod, up, movefocus, u"
-      "$mainMod, down, movefocus, d"
+      { _args = [ "SUPER + left" (lib.generators.mkLuaInline ''hl.dsp.focus({ direction = "left" })'') ]; }
+      { _args = [ "SUPER + right" (lib.generators.mkLuaInline ''hl.dsp.focus({ direction = "right" })'') ]; }
+      { _args = [ "SUPER + up" (lib.generators.mkLuaInline ''hl.dsp.focus({ direction = "up" })'') ]; }
+      { _args = [ "SUPER + down" (lib.generators.mkLuaInline ''hl.dsp.focus({ direction = "down" })'') ]; }
 
       # Workspaces
-      "$mainMod, 1, workspace, 1"
-      "$mainMod, 2, workspace, 2"
-      "$mainMod, 3, workspace, 3"
-      "$mainMod, 4, workspace, 4"
-      "$mainMod, 5, workspace, 5"
-      "$mainMod, 6, workspace, 6"
-      "$mainMod, 7, workspace, 7"
-      "$mainMod, 8, workspace, 8"
-      "$mainMod, 9, workspace, 9"
-      "$mainMod, 0, workspace, 10"
-
-      "$mainMod SHIFT, 1, movetoworkspace, 1"
-      "$mainMod SHIFT, 2, movetoworkspace, 2"
-      "$mainMod SHIFT, 3, movetoworkspace, 3"
-      "$mainMod SHIFT, 4, movetoworkspace, 4"
-      "$mainMod SHIFT, 5, movetoworkspace, 5"
-      "$mainMod SHIFT, 6, movetoworkspace, 6"
-      "$mainMod SHIFT, 7, movetoworkspace, 7"
-      "$mainMod SHIFT, 8, movetoworkspace, 8"
-      "$mainMod SHIFT, 9, movetoworkspace, 9"
-      "$mainMod SHIFT, 0, movetoworkspace, 10"
-    ];
-
-    bindm = [
+    ] ++ (lib.concatMap (i:
+      let
+        workspace = if i == 0 then 10 else i;
+      in
+      [
+        { _args = [ "SUPER + ${toString i}" (lib.generators.mkLuaInline "hl.dsp.focus({ workspace = ${toString workspace} })") ]; }
+        { _args = [ "SUPER + SHIFT + ${toString i}" (lib.generators.mkLuaInline "hl.dsp.window.move({ workspace = ${toString workspace} })") ]; }
+      ]
+    ) [ 1 2 3 4 5 6 7 8 9 0 ])
+    ++ [
       # Mouse
-      "$mainMod, mouse:272, movewindow"
-      "$mainMod, mouse:273, resizewindow"
+      { _args = [ "SUPER + mouse:272" (lib.generators.mkLuaInline "hl.dsp.window.drag()") { mouse = true; } ]; }
+      { _args = [ "SUPER + mouse:273" (lib.generators.mkLuaInline "hl.dsp.window.resize()") { mouse = true; } ]; }
     ];
   };
 }

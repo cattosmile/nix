@@ -6,9 +6,9 @@
     enableDefaultConfig = false;
 
     # Homeserver
-    matchBlocks.mini = {
-      hostname = "192.168.1.117";
-      user = "user";
+    settings.mini = {
+      HostName = "192.168.1.117";
+      User = "user";
     };
   };
 }

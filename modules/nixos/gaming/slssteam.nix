@@ -7,5 +7,5 @@
 #   slsSteam = inputs.sls-steam.packages.${system};
 # in
 {
-  environment.systemPackages = [ inputs.sls-steam.packages.${pkgs.system}.wrapped ];
+  environment.systemPackages = [ inputs.sls-steam.packages.${pkgs.stdenv.hostPlatform.system}.wrapped ];
 }

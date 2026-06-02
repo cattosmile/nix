@@ -11,7 +11,7 @@
 
   services.resolved = {
     enable = true;
-    fallbackDns = [ ];
+    settings.Resolve.FallbackDNS = [ ];
   };
 
   services.mullvad-vpn = {
