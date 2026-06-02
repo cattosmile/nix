@@ -13,7 +13,7 @@
   home.packages = with pkgs; [
     nixfmt-rfc-style
     nil
-    nodePackages.prettier
+    prettier
     nodejs_22
   ];
 
