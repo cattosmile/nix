@@ -37,7 +37,6 @@
       url = "github:AceSLS/SLSsteam";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    codex-desktop-linux.url = "github:ilysenko/codex-desktop-linux";
   };
 
   outputs =
@@ -49,7 +48,6 @@
       sops-nix,
       disko,
       nix-flatpak,
-      codex-desktop-linux,
       ...
     }@inputs:
     {
@@ -73,7 +71,6 @@
               )
               inputs.sops-nix.homeManagerModules.sops
               nix-flatpak.homeManagerModules.nix-flatpak
-              inputs.codex-desktop-linux.homeManagerModules.default
             ];
             home-manager.extraSpecialArgs = { inherit inputs; };
           }
