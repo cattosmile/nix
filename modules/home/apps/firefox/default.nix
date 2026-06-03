@@ -508,15 +508,15 @@ in
                   url = "https://chatgpt.com/";
                 }
                 {
-                  name = "ChatGPT Usage (Not working)";
-                  url = "https://chatgpt.com/";
+                  name = "ChatGPT Usage";
+                  url = "https://chatgpt.com/codex/settings/usage";
                 }
                 {
                   name = "Gemini";
                   url = "https://gemini.google.com/";
                 }
                 {
-                  name = "ChatGPT Usage (Not working)";
+                  name = "Gemini Usage";
                   url = "https://gemini.google.com/usage";
                 }
               ];

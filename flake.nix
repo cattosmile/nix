@@ -37,6 +37,8 @@
       url = "github:AceSLS/SLSsteam";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    kimi-cli.url = "github:MoonshotAI/kimi-cli";
+    nixslop.url = "github:cattosmile/NixSlop";
   };
 
   outputs =

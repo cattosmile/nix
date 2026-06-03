@@ -52,7 +52,7 @@
   services.btrfs.autoScrub.enable = true;
 
   # Hostname
-  networking.hostName = "nixos";
+  networking.hostName = "NixSlop";
 
   # Specific Packages only for this host
   environment.systemPackages = with pkgs; [

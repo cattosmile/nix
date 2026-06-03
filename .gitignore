@@ -13,6 +13,7 @@ result-*
 .vscode/
 .idea/
 .gemini/
+.omx/
 .claude/
 .kimi/
 
