@@ -127,40 +127,6 @@ PanelWindow {
                 anchors.verticalCenter:   parent.verticalCenter
             }
 
-            // Dummy button: each tap pushes a new notification onto the stack.
-            Rectangle {
-                id: popupButton
-                width:  Theme.islandWidth
-                height: Theme.islandWidth
-                radius: width / 2
-                color:  popupTap.pressed ? Theme.islandActive : Theme.islandBg
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom:           workspaceSwitcher.top
-                anchors.bottomMargin:     12
-
-                Behavior on color { ColorAnimation { duration: 150 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text:  "+"
-                    color: popupTap.pressed ? Theme.islandBg : Theme.islandActive
-                    font.pixelSize: 20
-                }
-
-                HoverHandler { cursorShape: Qt.PointingHandCursor }
-
-                TapHandler {
-                    id: popupTap
-                    onTapped: root.barState.pushNotification(
-                        -1,
-                        "Discord",
-                        "Fick Kimi",
-                        "Hey! Did you see my last message? 👀 I pushed the new build and the notification stack finally looks clean — wanna hop on call later?",
-                        "",
-                        true)
-                }
-            }
-
             TrayIsland {
                 id: trayIsland
                 anchors.bottom:           parent.bottom

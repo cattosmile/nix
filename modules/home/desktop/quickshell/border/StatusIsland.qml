@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import "../services"
 
 // Status widget island: Wifi · Bluetooth · VPN · Recording.
@@ -31,34 +30,19 @@ Item {
         color: Theme.islandBg
     }
 
-    // Right-click WiFi -> floating Alacritty with nmtui.
-    Component {
-        id: nmtuiTerm
-        Process {
-            command: ["hyprctl", "dispatch", "exec", "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -c 'nmtui; exec bash'"]
-            running: true
-            onRunningChanged: if (!running) destroy()
-        }
+    function openWifiTerminal() {
+        Quickshell.execDetached(["hyprctl", "dispatch", "exec",
+            "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -lc 'nmtui; exec bash'"])
     }
 
-    // Right-click VPN -> floating Alacritty that runs mullvad status, then drops to a shell.
-    Component {
-        id: mullvadStatusTerm
-        Process {
-            command: ["hyprctl", "dispatch", "exec", "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -c 'mullvad status; exec bash'"]
-            running: true
-            onRunningChanged: if (!running) destroy()
-        }
+    function openMullvadTerminal() {
+        Quickshell.execDetached(["hyprctl", "dispatch", "exec",
+            "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -lc 'mullvad status; exec bash'"])
     }
 
-    // Right-click Bluetooth -> floating Alacritty with bluetoothctl.
-    Component {
-        id: bluetoothctlTerm
-        Process {
-            command: ["hyprctl", "dispatch", "exec", "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -c 'bluetoothctl; exec bash'"]
-            running: true
-            onRunningChanged: if (!running) destroy()
-        }
+    function openBluetoothTerminal() {
+        Quickshell.execDetached(["hyprctl", "dispatch", "exec",
+            "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -lc 'bluetoothctl; exec bash'"])
     }
 
     Repeater {
@@ -104,28 +88,22 @@ Item {
                 }
             }
 
-            HoverHandler {
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
                 enabled: slot.index !== 3
+                hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                acceptedButtons: Qt.LeftButton
-                enabled: slot.index !== 3
-                onTapped: {
-                    if (slot.index === 0)      Wifi.toggle()
-                    else if (slot.index === 1) Bluetooth.toggle()
-                    else if (slot.index === 2) Vpn.toggle()
-                }
-            }
-
-            TapHandler {
-                acceptedButtons: Qt.RightButton
-                enabled: slot.index <= 2
-                onTapped: {
-                    if (slot.index === 0)      nmtuiTerm.createObject(root)
-                    else if (slot.index === 1) bluetoothctlTerm.createObject(root)
-                    else if (slot.index === 2) mullvadStatusTerm.createObject(root)
+                onClicked: (mouse) => {
+                    if (mouse.button === Qt.LeftButton) {
+                        if (slot.index === 0)      Wifi.toggle()
+                        else if (slot.index === 1) Bluetooth.toggle()
+                        else if (slot.index === 2) Vpn.toggle()
+                    } else if (mouse.button === Qt.RightButton) {
+                        if (slot.index === 0)      root.openWifiTerminal()
+                        else if (slot.index === 1) root.openBluetoothTerminal()
+                        else if (slot.index === 2) root.openMullvadTerminal()
+                    }
                 }
             }
         }

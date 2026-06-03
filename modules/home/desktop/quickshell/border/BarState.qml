@@ -13,10 +13,10 @@ QtObject {
     // Committed once per toggle so Hyprland reflows the layout a single time.
     property real exclusionBarWidth: Theme.barWidth
 
-    // Active notification stack. Each press of the bar button appends an entry;
-    // CenterPopup renders one block per entry at the same position (newest drawn on
-    // top) and removes it once its auto-retract finishes. notifId is a stable key so
-    // a block can remove itself by id regardless of its index.
+    // Active notification stack. CenterPopup renders one block per entry at the
+    // same position (newest drawn on top) and removes it once its auto-retract
+    // finishes. notifId is a stable key so a block can remove itself by id
+    // regardless of its index.
     property int notifSeq: 0
     property ListModel notifications: ListModel {}
 
@@ -28,10 +28,10 @@ QtObject {
         }
     }
 
-    // srvId is the server-side notification id (-1 for the dummy/test button) so a
-    // block can release the tracked notification when it retracts; notifId is our
-    // own stable per-block key for the model/animations. circle renders the avatar
-    // as a circle (Discord) instead of a rounded square.
+    // srvId is the server-side notification id so a block can release the tracked
+    // notification when it retracts; notifId is our own stable per-block key for
+    // the model/animations. circle renders the avatar as a circle (Discord)
+    // instead of a rounded square.
     function pushNotification(srvId, app, username, preview, image, circle) {
         notifications.append({
             notifId:  barState.notifSeq++,
