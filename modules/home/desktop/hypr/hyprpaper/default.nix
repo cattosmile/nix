@@ -1,4 +1,9 @@
-{ inputs, pkgs, ... }:
+{
+  hyprMonitors,
+  inputs,
+  pkgs,
+  ...
+}:
 
 let
   wallpaper1 = ../../../../../assets/walls/tracker.jpg;
@@ -20,11 +25,11 @@ in
 
       wallpaper = [
         {
-          monitor = "DP-1";
+          monitor = hyprMonitors.primary;
           path = "${wallpaper1}";
         }
         {
-          monitor = "DP-2";
+          monitor = hyprMonitors.secondary;
           path = "${wallpaper2}";
         }
       ];

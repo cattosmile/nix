@@ -1,23 +1,23 @@
-{ ... }:
+{ hyprMonitors, ... }:
 
 {
   wayland.windowManager.hyprland.settings = {
     monitor = [
       {
-        output = "DP-1";
+        output = hyprMonitors.primary;
         mode = "3840x2160@144";
         position = "0x0";
         scale = 1.5;
       }
       {
-        output = "DP-2";
+        output = hyprMonitors.secondary;
         mode = "1920x1080@240";
         position = "-1080x0";
         scale = 1;
         transform = 1;
       }
       {
-        output = "HDMI-A-2";
+        output = hyprMonitors.disabled;
         disabled = true;
       }
     ];

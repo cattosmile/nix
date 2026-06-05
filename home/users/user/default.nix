@@ -5,6 +5,6 @@
   home-manager.useUserPackages = true;
   home-manager.users.user = {
     imports = [ ../../../modules/home ];
-    home.stateVersion = "25.11";
+    home.stateVersion = "26.05";
   };
 }

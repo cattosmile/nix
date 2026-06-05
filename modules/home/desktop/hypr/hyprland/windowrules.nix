@@ -1,10 +1,13 @@
-{ ... }:
+{ hyprMonitors, ... }:
 
 {
   wayland.windowManager.hyprland.settings = {
     window_rule = [
       # Hyprland Defaults
-      { match.class = ".*"; suppress_event = "maximize"; }
+      {
+        match.class = ".*";
+        suppress_event = "maximize";
+      }
       {
         no_focus = true;
         match = {
@@ -18,49 +21,128 @@
       }
 
       # Gamescope
-      { match.class = "^gamescope$"; workspace = "1 silent"; fullscreen = true; }
-      { match.class = "^\\.gamescope-wrapped$"; workspace = "1 silent"; fullscreen = true; }
+      {
+        match.class = "^gamescope$";
+        workspace = "1 silent";
+        fullscreen = true;
+      }
+      {
+        match.class = "^\\.gamescope-wrapped$";
+        workspace = "1 silent";
+        fullscreen = true;
+      }
 
       # Roblox / Sober
-      { match.class = "^(org.vinegarhq.Sober)$"; workspace = "1 silent"; }
-      { match = { class = "^(org.vinegarhq.Sober)$"; title = "^(Profile)$"; }; workspace = "1 silent"; }
-      { match = { class = "^(org.vinegarhq.Sober)$"; title = "^(Servers)$"; }; workspace = "1 silent"; }
-      { match = { class = "^(org.vinegarhq.Sober)$"; title = "^(Account info)$"; }; workspace = "1 silent"; }
+      {
+        match.class = "^(org.vinegarhq.Sober)$";
+        workspace = "1 silent";
+      }
+      {
+        match = {
+          class = "^(org.vinegarhq.Sober)$";
+          initial_title = "negative:^Sober$";
+        };
+        float = true;
+        center = true;
+        size = "1000 600";
+      }
 
       # Discord
-      { match.class = "^(discord)$"; workspace = "10 silent"; }
+      {
+        match.class = "^(discord)$";
+        workspace = "10 silent";
+      }
 
       # Terminal
-      { match.title = "alacritty_float"; float = true; center = true; size = "1000 600"; monitor = "DP-1"; }
+      {
+        match.title = "alacritty_float";
+        float = true;
+        center = true;
+        size = "1000 600";
+        monitor = hyprMonitors.primary;
+      }
 
       # Volume Control
-      { match.class = "^(org.pulseaudio.pavucontrol)$"; float = true; center = true; size = "1000 600"; monitor = "DP-1"; }
+      {
+        match.class = "^(org.pulseaudio.pavucontrol)$";
+        float = true;
+        center = true;
+        size = "1000 600";
+        monitor = hyprMonitors.primary;
+      }
 
       # Image Viewer?
-      { match.class = "^(swappy)$"; float = true; center = true; monitor = "DP-1"; }
+      {
+        match.class = "^(swappy)$";
+        float = true;
+        center = true;
+        monitor = hyprMonitors.primary;
+      }
 
       # Dialogs
-      { match.title = "^(Open File|Save As|Upload File|Add Folder to Workspace)$"; float = true; center = true; size = "1000 600"; }
+      {
+        match.title = "^(Open File|Save As|Upload File|Add Folder to Workspace)$";
+        float = true;
+        center = true;
+        size = "1000 600";
+      }
 
       # Steam
-      { match.class = "^(steam)$"; workspace = "2 silent"; }
       {
-        match = { class = "^(steam)$"; title = "^(Friends List)$"; };
+        match.class = "^(steam)$";
+        workspace = "2 silent";
+      }
+      {
+        match = {
+          class = "^(steam)$";
+          title = "negative:^(Steam||Friends List|Special Offers)$";
+        };
+        float = true;
+        center = true;
+        monitor = hyprMonitors.primary;
+      }
+      {
+        match = {
+          class = "^(steam)$";
+          title = "^(Friends List)$";
+        };
         float = true;
         size = "300 600";
-        monitor = "DP-1";
+        monitor = hyprMonitors.primary;
         move = "(monitor_w-window_w-200) ((monitor_h-window_h)/2)";
       }
-      { match = { class = "^(steam)$"; title = "^(Special Offers)$"; }; workspace = "special:void silent"; no_focus = true; }
+      {
+        match = {
+          class = "^(steam)$";
+          title = "^(Special Offers)$";
+        };
+        workspace = "special:void silent";
+        no_focus = true;
+      }
 
       # Spotify
-      { match.class = "^(Spotify)$"; workspace = "9 silent"; tile = true; }
+      {
+        match.class = "^(Spotify)$";
+        workspace = "9 silent";
+        tile = true;
+      }
 
       # File Roller (Zip, Rar)
-      { match.class = "^(org.gnome.FileRoller)$"; float = true; center = true; monitor = "DP-1"; }
+      {
+        match.class = "^(org.gnome.FileRoller)$";
+        float = true;
+        center = true;
+        monitor = hyprMonitors.primary;
+      }
 
       # Calculator
-      { match.class = "^(org.gnome.Calculator)$"; float = true; center = true; size = "250 700"; monitor = "DP-1"; }
+      {
+        match.class = "^(org.gnome.Calculator)$";
+        float = true;
+        center = true;
+        size = "250 700";
+        monitor = hyprMonitors.primary;
+      }
     ];
   };
 }

@@ -12,5 +12,6 @@
     ./spicetify
     ./flatpak
     ./codex
+    ./ida-pro
   ];
 }

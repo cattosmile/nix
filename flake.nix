@@ -39,6 +39,10 @@
     };
     kimi-cli.url = "github:MoonshotAI/kimi-cli";
     nixslop.url = "github:cattosmile/NixSlop";
+    ida-pro = {
+      url = "git+file:///home/user/Projects/IDA%20Pro";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -73,6 +77,7 @@
               )
               inputs.sops-nix.homeManagerModules.sops
               nix-flatpak.homeManagerModules.nix-flatpak
+              inputs.ida-pro.homeManagerModules.default
             ];
             home-manager.extraSpecialArgs = { inherit inputs; };
           }
@@ -80,6 +85,7 @@
           {
             nixpkgs.overlays = [
               inputs.nur.overlays.default
+              inputs.ida-pro.overlays.default
               (final: prev: {
                 unstable = import nixpkgs-unstable {
                   system = final.stdenv.hostPlatform.system;

@@ -1,6 +1,7 @@
 {
   pkgs,
   unstable,
+  inputs,
   ...
 }:
 
@@ -13,6 +14,7 @@
     nemo-with-extensions
     mousepad
     unstable.code-cursor-fhs
+    unstable.helvum
   ];
 }
 

@@ -15,7 +15,7 @@
 
   programs.bash = {
     shellAliases = {
-      #      omx = "omx --tmux --hotswap --madmax";
+      x = "omx --tmux --hotswap --madmax";
     };
   };
 }

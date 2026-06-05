@@ -23,6 +23,8 @@ Item {
 
     implicitWidth:  Theme.islandWidth
     implicitHeight: (count - 1) * slotSpacing + Math.max(...iconSizes) + islandPadV * 2
+    width: implicitWidth
+    height: implicitHeight
 
     Rectangle {
         anchors.fill: parent
@@ -43,6 +45,30 @@ Item {
     function openBluetoothTerminal() {
         Quickshell.execDetached(["hyprctl", "dispatch", "exec",
             "[float;center;size 1000 600] alacritty --title float_alacritty -e bash -lc 'bluetoothctl; exec bash'"])
+    }
+
+    function slotIndexAt(y) {
+        for (let i = 0; i < 3; i++) {
+            const slotY = root.islandPadV + i * root.slotSpacing
+                + (root.iconSizes[i] - root.slotSpacing) / 2
+
+            if (y >= slotY && y <= slotY + root.slotSpacing)
+                return i
+        }
+
+        return -1
+    }
+
+    function toggleSlot(index) {
+        if (index === 0)      Wifi.toggle()
+        else if (index === 1) Bluetooth.toggle()
+        else if (index === 2) Vpn.toggle()
+    }
+
+    function openSlotTerminal(index) {
+        if (index === 0)      root.openWifiTerminal()
+        else if (index === 1) root.openBluetoothTerminal()
+        else if (index === 2) root.openMullvadTerminal()
     }
 
     Repeater {
@@ -87,25 +113,40 @@ Item {
                     }
                 }
             }
+        }
+    }
 
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                enabled: slot.index !== 3
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: (mouse) => {
-                    if (mouse.button === Qt.LeftButton) {
-                        if (slot.index === 0)      Wifi.toggle()
-                        else if (slot.index === 1) Bluetooth.toggle()
-                        else if (slot.index === 2) Vpn.toggle()
-                    } else if (mouse.button === Qt.RightButton) {
-                        if (slot.index === 0)      root.openWifiTerminal()
-                        else if (slot.index === 1) root.openBluetoothTerminal()
-                        else if (slot.index === 2) root.openMullvadTerminal()
-                    }
-                }
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        hoverEnabled: true
+        cursorShape: root.slotIndexAt(mouseY) >= 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+        z: 100
+
+        onPressed: (mouse) => {
+            const index = root.slotIndexAt(mouse.y)
+            if (index < 0) {
+                mouse.accepted = false
+                return
             }
+
+            mouse.accepted = true
+
+            if (mouse.button === Qt.RightButton)
+                root.openSlotTerminal(index)
+        }
+
+        onClicked: (mouse) => {
+            const index = root.slotIndexAt(mouse.y)
+            if (index < 0) {
+                mouse.accepted = false
+                return
+            }
+
+            mouse.accepted = true
+
+            if (mouse.button === Qt.LeftButton)
+                root.toggleSlot(index)
         }
     }
 }
