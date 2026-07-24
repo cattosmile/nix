@@ -4,9 +4,7 @@ let
   # Workaround for NixCord bug: local path literals in userPlugins lose
   # sandbox dependency tracking because NixCord uses lib.escapeShellArg.
   # Wrapping in a derivation (also documented as valid) fixes this.
-  followUserPlugin = pkgs.writeTextDir "index.tsx" (
-    builtins.readFile ./plugins/followUser/index.tsx
-  );
+  followUserPlugin = pkgs.writeTextDir "index.tsx" (builtins.readFile ./plugins/followUser/index.tsx);
 in
 {
   imports = [ inputs.nixcord.homeModules.nixcord ];
@@ -22,12 +20,12 @@ in
 
     config.plugins = {
       # Vencord Plugins
-      ClearURLs.enable = true;
+      clearUrls.enable = true;
       disableCallIdle.enable = true;
       forceOwnerCrown.enable = true;
-      friendsSince.enable = true;
+      #  friendsSince.enable = true;
       keepCurrentChannel.enable = true;
-      MutualGroupDMs.enable = true;
+      mutualGroupDms.enable = true;
       noMiddleClickPaste.enable = true;
       noF1.enable = true;
       noDevtoolsWarning.enable = true;
@@ -48,10 +46,10 @@ in
       gameActivityToggle.enable = true;
       imageZoom.enable = true;
       noPendingCount.enable = true;
-      PinDMs.enable = true;
+      pinDms.enable = true;
       platformIndicators.enable = true;
       relationshipNotifier.enable = true;
-      ReviewDB.enable = true;
+      reviewDb.enable = true;
       serverInfo.enable = true;
       showHiddenChannels.enable = true;
       sortFriends.enable = true;

@@ -22,6 +22,11 @@
 
       # Gamescope
       {
+        match.class = "^(chromium-browser)$";
+        workspace = "3 silent";
+        fullscreen = false;
+      }
+      {
         match.class = "^gamescope$";
         workspace = "1 silent";
         fullscreen = true;
@@ -68,7 +73,6 @@
         float = true;
         center = true;
         size = "1000 600";
-        monitor = hyprMonitors.primary;
       }
 
       # Image Viewer?

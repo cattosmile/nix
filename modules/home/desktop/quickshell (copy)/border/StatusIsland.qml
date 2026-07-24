@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "../services"
-import "../components"
 
 // Status widget island: Wifi · Bluetooth · VPN · Recording.
 // Uses Font Awesome 7 (Free Solid + Brands).
@@ -27,7 +26,7 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
-    FilletRect {
+    Rectangle {
         anchors.fill: parent
         radius: width / 2
         color: Theme.islandBg

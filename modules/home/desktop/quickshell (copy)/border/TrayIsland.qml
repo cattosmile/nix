@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Services.SystemTray
-import "../components"
 
 Item {
     id: root
@@ -15,8 +14,6 @@ Item {
     implicitHeight: SystemTray.items.values.length <= 1
                       ? implicitWidth
                       : trayColumn.implicitHeight + islandPadV * 2
-    width: implicitWidth
-    height: implicitHeight
 
     Behavior on implicitHeight {
         NumberAnimation {
@@ -79,7 +76,7 @@ Item {
         easing.type: Easing.InQuad
     }
 
-    FilletRect {
+    Rectangle {
         anchors.fill: parent
         radius: width / 2
         color: Theme.islandBg

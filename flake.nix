@@ -14,7 +14,9 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    hyprland.url = "github:hyprwm/Hyprland";
+    # Deliberately pinned to the currently installed Hyprland 0.55.0 build.
+    # Change this revision manually when an upgrade is wanted.
+    hyprland.url = "github:hyprwm/Hyprland/ad317198d90ec1060ec11402695152e5c71a3546";
     hyprpaper = {
       url = "github:hyprwm/hyprpaper";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -37,12 +39,12 @@
       url = "github:AceSLS/SLSsteam";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    kimi-cli.url = "github:MoonshotAI/kimi-cli";
     nixslop.url = "github:cattosmile/NixSlop";
     ida-pro = {
-      url = "git+file:///home/user/Projects/IDA%20Pro";
+      url = "git+http://192.168.1.117:3000/cattosmile/ida-pro-nix.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    kopuz.url = "github:temidaradev/kopuz";
   };
 
   outputs =

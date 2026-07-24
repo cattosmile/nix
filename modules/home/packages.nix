@@ -15,6 +15,8 @@
     mousepad
     unstable.code-cursor-fhs
     unstable.helvum
+    prismlauncher
+    vlc
   ];
 }
 

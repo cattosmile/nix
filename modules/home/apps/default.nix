@@ -13,5 +13,7 @@
     ./flatpak
     ./codex
     ./ida-pro
+    ./feishin
+    ./telegram
   ];
 }

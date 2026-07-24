@@ -3,7 +3,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
-import "../components"
 
 // Vertical workspace indicator for the right bar.
 // Pills sit on a dark island; a white pill slides (spring) to the active slot.
@@ -21,8 +20,6 @@ Item {
 
     implicitWidth:  Theme.islandWidth
     implicitHeight: (count - 1) * dotSpacing + activePillH + islandPadV * 2
-    width: implicitWidth
-    height: implicitHeight
 
     // Track by monitor name so focus on other monitors doesn't move the bubble.
     // Macbook internal display (eDP-*) or fallback to first monitor.
@@ -54,7 +51,7 @@ Item {
     }
 
     // ── Island ───────────────────────────────────────────────────────────────
-    FilletRect {
+    Rectangle {
         anchors.fill: parent
         radius: width / 2
         color:  Theme.islandBg

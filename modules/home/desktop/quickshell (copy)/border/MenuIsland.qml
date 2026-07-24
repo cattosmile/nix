@@ -1,22 +1,15 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import "../components"
 
-ConnectedFilletRect {
+Rectangle {
     id: root
     implicitWidth: 400
     implicitHeight: 180
-    radius: Theme.innerRadius
-    connectorWidth: 24
-    connectorRadius: Theme.innerRadius
-    connectRight: true
+    radius: 20
     color: Theme.islandBg
 
     Loader {
-        x: 0
-        y: 0
-        width: root.width - root.connectorWidth
-        height: parent.height
+        anchors.fill: parent
         sourceComponent: textComponent
     }
 

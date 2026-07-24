@@ -14,6 +14,12 @@
       "root"
       "@wheel"
     ];
+    extra-substituters = [
+      "https://nixslop.cachix.org?priority=30"
+    ];
+    extra-trusted-public-keys = [
+      "nixslop.cachix.org-1:Y41flUqIXb+Qx7D6hiugUE17RG4EkLaBn3UlVXc1oE8="
+    ];
   };
 
   nix.gc = {
@@ -26,4 +32,8 @@
   nix.registry.nixpkgs.flake = inputs.nixpkgs;
   programs.nix-ld.enable = true;
   services.fwupd.enable = true;
+
+  security.pki.certificateFiles = [
+    ./root_ca.crt
+  ];
 }

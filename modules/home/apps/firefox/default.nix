@@ -1,6 +1,20 @@
 { pkgs, ... }:
 
 let
+  btroblox = pkgs.nur.repos.rycee.firefox-addons.buildFirefoxXpiAddon {
+    pname = "btroblox";
+    version = "3.6.21";
+    addonId = "btroblox@antiboomz.com";
+    url = "https://addons.mozilla.org/firefox/downloads/file/4555645/btroblox-3.6.21.xpi";
+    sha256 = "sha256-h1cusNt8v7hXLP7L01bxwaNUzX1t9q+LKeGqC9GqAOU=";
+    meta = {
+      homepage = "https://addons.mozilla.org/firefox/addon/btroblox/";
+      description = "Enhances the Roblox website with additional features";
+      license = pkgs.lib.licenses.unfree;
+      platforms = pkgs.lib.platforms.all;
+    };
+  };
+
   commonSettings = {
     # NixOS Integration
     "extensions.autoDisableScopes" = 0;
@@ -151,6 +165,12 @@ in
   programs.firefox = {
     enable = true;
     configPath = ".mozilla/firefox";
+
+    # Use local SSL cert
+    policies = {
+      ImportSystemUserCerts = true; 
+    };
+
     profiles = {
 
       # ------------------------------------------------------------------------------------
@@ -306,6 +326,7 @@ in
         extensions.packages = with pkgs.nur.repos.rycee.firefox-addons; [
           ublock-origin
           bitwarden
+          btroblox
         ];
         settings = commonSettings // {
           "browser.startup.homepage" = "https://roblox.com";

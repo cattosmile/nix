@@ -2,9 +2,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import "../services"
-import "../components"
 
-FilletRect {
+Rectangle {
     id: root
     width:  Theme.islandWidth
     height: 90

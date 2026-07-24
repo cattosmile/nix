@@ -2,9 +2,9 @@
 
 let
   win10nvmeXml = pkgs.writeText "win10-nvme.xml" ''
-        <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
-      <name>win10-nvme</name>
-      <uuid>e9588387-f874-4eeb-af33-26cbaf04f2a6</uuid>
+    <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
+      <name>win10-ssd</name>
+      <uuid>7c2a4b91-d83f-4e12-a6b4-928c7f1e5d3a</uuid>
       <metadata>
         <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
           <libosinfo:os id="http://microsoft.com/win/10"/>
@@ -37,8 +37,8 @@ let
           <entry name="manufacturer">ASUS</entry>
           <entry name="product">ROG STRIX B660-F GAMING WIFI</entry>
           <entry name="version">1.0</entry>
-          <entry name="serial">N4M0KC12958Y</entry>
-          <entry name="uuid">e9588387-f874-4eeb-af33-26cbaf04f2a6</entry>
+          <entry name="serial">P3M0KC74921W</entry>
+          <entry name="uuid">7c2a4b91-d83f-4e12-a6b4-928c7f1e5d3a</entry>
           <entry name="sku">SKU-Default</entry>
           <entry name="family">Rog Strix</entry>
         </system>
@@ -46,24 +46,24 @@ let
           <entry name="manufacturer">ASUS</entry>
           <entry name="product">ROG STRIX B660-F GAMING WIFI</entry>
           <entry name="version">1.0</entry>
-          <entry name="serial">N4M0KC12958Y</entry>
+          <entry name="serial">P3M0KC74921W</entry>
         </baseBoard>
         <chassis>
           <entry name="manufacturer">ASUS</entry>
           <entry name="version">1.0</entry>
-          <entry name="serial">N4M0KC12958Y</entry>
+          <entry name="serial">P3M0KC74921W</entry>
           <entry name="asset">Default String</entry>
           <entry name="sku">SKU-Default</entry>
         </chassis>
       </sysinfo>
       <os firmware="efi">
-        <type arch="x86_64" machine="pc-q35-10.1">hvm</type>
+        <type arch="x86_64" machine="pc-q35-10.2">hvm</type>
         <firmware>
           <feature enabled="no" name="enrolled-keys"/>
           <feature enabled="yes" name="secure-boot"/>
         </firmware>
         <loader readonly="yes" secure="yes" type="pflash" format="raw">/run/libvirt/nix-ovmf/edk2-x86_64-secure-code.fd</loader>
-        <nvram template="/run/libvirt/nix-ovmf/edk2-i386-vars.fd" templateFormat="raw" format="raw">/var/lib/libvirt/qemu/nvram/win10-nvme_VARS.fd</nvram>
+        <nvram template="/run/libvirt/nix-ovmf/edk2-i386-vars.fd" templateFormat="raw" format="raw">/var/lib/libvirt/qemu/nvram/win10-ssd_VARS.fd</nvram>
         <smbios mode="sysinfo"/>
       </os>
       <features>
@@ -203,7 +203,7 @@ let
           <address type="pci" domain="0x0000" bus="0x03" slot="0x00" function="0x0"/>
         </controller>
         <interface type="network">
-          <mac address="a8:5e:46:d3:81:2f"/>
+          <mac address="a8:5e:46:9b:2c:14"/>
           <source network="default"/>
           <model type="e1000e"/>
           <address type="pci" domain="0x0000" bus="0x02" slot="0x00" function="0x0"/>
@@ -262,10 +262,10 @@ let
         <qemu:arg value="input-linux,id=mouse1,evdev=/dev/input/by-id/usb-Logitech_USB_Receiver-event-mouse"/>
         <qemu:arg value="-object"/>
         <qemu:arg value="input-linux,id=kbd1,evdev=/dev/input/by-id/usb-Lenovo_Lenovo_Traditional_USB_Keyboard-event-kbd,grab_all=on,repeat=on,grab-toggle=ctrl-ctrl"/>
-        <qemu:arg value="-object"/>
-        <qemu:arg value="{'qom-type':'memory-backend-file','id':'looking-glass','mem-path':'/dev/kvmfr0','size':33554432,'share':true}"/>
         <qemu:arg value="-device"/>
         <qemu:arg value="{'driver':'ivshmem-plain','id':'shmem0','memdev':'looking-glass'}"/>
+        <qemu:arg value="-object"/>
+        <qemu:arg value="{'qom-type':'memory-backend-file','id':'looking-glass','mem-path':'/dev/kvmfr0','size':33554432,'share':true}"/>
       </qemu:commandline>
     </domain>
   '';
