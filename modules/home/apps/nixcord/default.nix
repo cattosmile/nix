@@ -5,6 +5,13 @@ let
   # sandbox dependency tracking because NixCord uses lib.escapeShellArg.
   # Wrapping in a derivation (also documented as valid) fixes this.
   followUserPlugin = pkgs.writeTextDir "index.tsx" (builtins.readFile ./plugins/followUser/index.tsx);
+  fakeDeafenPlugin = pkgs.writeTextDir "index.tsx" (builtins.readFile ./plugins/fakeDeafen/index.tsx);
+  streamQualityPlugin = pkgs.runCommand "stream-quality-plugin" { } ''
+    mkdir -p "$out"
+    cp ${./plugins/streamQuality/index.tsx} "$out/index.tsx"
+    cp ${./plugins/streamQuality/style.css} "$out/style.css"
+    cp ${./plugins/streamQuality/default-preview.png} "$out/default-preview.png"
+  '';
 in
 {
   imports = [ inputs.nixcord.homeModules.nixcord ];
@@ -17,6 +24,8 @@ in
     discord.equicord.enable = true;
 
     userPlugins.followUser = followUserPlugin;
+    userPlugins.fakeDeafen = fakeDeafenPlugin;
+    userPlugins.streamQuality = streamQualityPlugin;
 
     config.plugins = {
       # Vencord Plugins
@@ -92,5 +101,7 @@ in
     };
 
     extraConfig.plugins.followUser.enable = true;
+    extraConfig.plugins.fakeDeafen.enable = true;
+    extraConfig.plugins.streamQuality.enable = true;
   };
 }
