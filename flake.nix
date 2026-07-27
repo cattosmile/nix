@@ -14,9 +14,8 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Deliberately pinned to the currently installed Hyprland 0.55.0 build.
-    # Change this revision manually when an upgrade is wanted.
-    hyprland.url = "github:hyprwm/Hyprland/ad317198d90ec1060ec11402695152e5c71a3546";
+    # Pin Hyprland to the 0.56.0 release. Update this tag deliberately.
+    hyprland.url = "github:hyprwm/Hyprland/v0.56.0";
     hyprpaper = {
       url = "github:hyprwm/hyprpaper";
       inputs.nixpkgs.follows = "nixpkgs";

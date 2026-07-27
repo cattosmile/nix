@@ -6,7 +6,7 @@
 }:
 
 let
-  wallpaper1 = ../../../../../assets/walls/arschlinux.jpg;
+  wallpaper1 = ../../../../../assets/walls/arschlinux.png;
   wallpaper2 = ../../../../../assets/walls/black.png;
 in
 
