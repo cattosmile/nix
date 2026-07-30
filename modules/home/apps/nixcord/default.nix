@@ -6,6 +6,11 @@ let
   # Wrapping in a derivation (also documented as valid) fixes this.
   followUserPlugin = pkgs.writeTextDir "index.tsx" (builtins.readFile ./plugins/followUser/index.tsx);
   fakeDeafenPlugin = pkgs.writeTextDir "index.tsx" (builtins.readFile ./plugins/fakeDeafen/index.tsx);
+  squareNotificationAvatarsPlugin = pkgs.runCommand "square-notification-avatars-plugin" { } ''
+    mkdir -p "$out"
+    cp ${./plugins/squareNotificationAvatars/index.tsx} "$out/index.tsx"
+    cp ${./plugins/squareNotificationAvatars/native.ts} "$out/native.ts"
+  '';
   streamQualityPlugin = pkgs.runCommand "stream-quality-plugin" { } ''
     mkdir -p "$out"
     cp ${./plugins/streamQuality/index.tsx} "$out/index.tsx"
@@ -25,6 +30,7 @@ in
 
     userPlugins.followUser = followUserPlugin;
     userPlugins.fakeDeafen = fakeDeafenPlugin;
+    userPlugins.squareNotificationAvatars = squareNotificationAvatarsPlugin;
     userPlugins.streamQuality = streamQualityPlugin;
 
     config.plugins = {
@@ -83,6 +89,15 @@ in
         allowChangingDangerousSettings = true;
         completeVideoQuestsQuicker = true;
         makeMobileVideoQuestsDesktopCompatible = true;
+        notifyOnQuestComplete = false;
+        notifyOnNewQuests = false;
+        notifyOnNewExcludedQuests = false;
+        questCompletedAlertSound = "";
+        questCompletedAlertVolume = 0;
+        newQuestAlertSound = "";
+        newQuestAlertVolume = 0;
+        newExcludedQuestAlertSound = null;
+        newExcludedQuestAlertVolume = 0;
         autoCompleteQuestTypes = {
           PLAY_ON_DESKTOP = true;
           PLAY_ON_XBOX = true;
@@ -102,6 +117,7 @@ in
 
     extraConfig.plugins.followUser.enable = true;
     extraConfig.plugins.fakeDeafen.enable = true;
+    extraConfig.plugins.squareNotificationAvatars.enable = true;
     extraConfig.plugins.streamQuality.enable = true;
   };
 }

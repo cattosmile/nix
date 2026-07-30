@@ -1,10 +1,6 @@
 { pkgs, lib, ... }:
 
 let
-  win10-240gbssd-network = import ./win10-240gbssd-network.nix {
-    physicalInterface = "enp10s0";
-  };
-
   vms = {
     win10-nvme = ''
       <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
@@ -482,7 +478,12 @@ let
         <source dev='/dev/disk/by-id/ata-CT240BX500SSD1_1936E198FFCC'/>
         <target dev='vda' bus='virtio'/>
       </disk>
-            ${win10-240gbssd-network}
+            <interface type="direct">
+              <mac address="a8:5e:46:9b:2c:14"/>
+              <source dev="enp10s0" mode="bridge"/>
+              <model type="e1000e"/>
+              <address type="pci" domain="0x0000" bus="0x02" slot="0x00" function="0x0"/>
+            </interface>
             <serial type="pty">
               <target type="isa-serial" port="0">
                 <model name="isa-serial"/>

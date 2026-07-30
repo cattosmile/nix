@@ -1,6 +1,23 @@
-{ pkgs, inputs, ... }:
+{
+  inputs,
+  lib,
+  pkgs,
+  ...
+}:
+
+let
+  rice = import ./package.nix {
+    inherit inputs lib pkgs;
+  };
+in
 
 {
-  home.packages = [ inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.default ];
-  xdg.configFile."quickshell".source = ./.;
+  home.packages = [
+    rice.ipc
+    rice.quickshell
+    rice.reload
+    rice.start
+  ];
+
+  xdg.configFile."quickshell/rice".source = rice.config;
 }

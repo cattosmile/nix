@@ -1,5 +1,6 @@
 {
   hyprMonitors,
+  inputs,
   lib,
   pkgs,
   ...
@@ -29,9 +30,18 @@ let
   alacritty = lib.getExe pkgs.alacritty;
   grim = lib.getExe pkgs.grim;
   nemo = lib.getExe pkgs.nemo-with-extensions;
+  rice = import ../../quickshell/package.nix {
+    inherit inputs lib pkgs;
+  };
+  quickshellLauncherToggle = lib.escapeShellArgs [
+    (lib.getExe rice.ipc)
+    "call"
+    "launcher"
+    "toggle"
+  ];
+  quickshellReload = lib.getExe rice.reload;
   slurp = lib.getExe pkgs.slurp;
   swappy = lib.getExe pkgs.swappy;
-  wofi = lib.getExe pkgs.wofi;
   wlCopy = lib.getExe' pkgs.wl-clipboard "wl-copy";
   wlPaste = lib.getExe' pkgs.wl-clipboard "wl-paste";
 in
@@ -69,7 +79,13 @@ in
       {
         _args = [
           "SUPER + SPACE"
-          (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${wofi} --show drun")'')
+          (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${quickshellLauncherToggle}]])")
+        ];
+      }
+      {
+        _args = [
+          "SUPER + SHIFT + R"
+          (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${quickshellReload}]])")
         ];
       }
 
