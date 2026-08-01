@@ -5,7 +5,7 @@ Item {
     id: root
 
     width: 32
-    height: 154.6667
+    height: 115.6667
 
     readonly property var timeLines: [
         Qt.formatDateTime(clock.date, "HH"),
@@ -26,8 +26,7 @@ Item {
         id: clockIsland
 
         anchors {
-            bottom: powerButton.top
-            bottomMargin: 7
+            bottom: parent.bottom
             horizontalCenter: parent.horizontalCenter
         }
         width: 32
@@ -199,12 +198,4 @@ Item {
         }
     }
 
-    PowerButton {
-        id: powerButton
-
-        anchors {
-            bottom: parent.bottom
-            horizontalCenter: parent.horizontalCenter
-        }
-    }
 }

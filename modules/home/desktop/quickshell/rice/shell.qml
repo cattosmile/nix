@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Wayland
 import QtQuick
 
 ShellRoot {
@@ -15,13 +16,71 @@ ShellRoot {
             id: borderSet
 
             property var modelData
-
             BorderFrame {
+                id: borderFrame
+
                 screen: borderSet.modelData
                 thickness: root.borderThickness
                 rightThickness: root.rightBarWidth
                 innerCornerSmoothness: root.innerCornerSmoothness
                 borderColor: Theme.frame
+            }
+
+            // BorderFrame handles dismissal on its own screen. Create the
+            // same transparent click-capture surface on every other screen so
+            // dismissal never depends on a connector name such as DP-2.
+            Variants {
+                model: Quickshell.screens.filter(
+                    screen => screen !== borderSet.modelData
+                )
+
+                Scope {
+                    id: launcherDismissalSet
+
+                    property var modelData
+
+                    PanelWindow {
+                        screen: launcherDismissalSet.modelData
+                        visible: borderFrame.launcherDismissalCaptureActive
+                            && launcherDismissalSet.modelData !== null
+                        aboveWindows: true
+                        exclusionMode: ExclusionMode.Ignore
+                        WlrLayershell.layer: WlrLayer.Overlay
+                        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+                        mask: null
+                        color: Theme.transparent
+
+                        anchors {
+                            top: true
+                            bottom: true
+                            left: true
+                            right: true
+                        }
+
+                        Item {
+                            anchors.fill: parent
+                            focus: true
+
+                            Component.onCompleted: forceActiveFocus()
+
+                            Keys.onPressed: event => {
+                                event.accepted = borderFrame.handleLauncherKey(
+                                    event.key,
+                                    event.text || "",
+                                    event.modifiers
+                                )
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton
+                                onClicked: {
+                                    borderFrame.dismissLauncherFromPointer()
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             EdgeReserve {

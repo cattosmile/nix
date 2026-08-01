@@ -38,7 +38,11 @@
       url = "github:AceSLS/SLSsteam";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nixslop.url = "github:cattosmile/NixSlop";
+    codex-computer-use-fork.url = "path:/home/user/Projects/ComputerUseFix";
+    nixslop = {
+      url = "github:cattosmile/NixSlop";
+      inputs.codex-desktop-linux.follows = "codex-computer-use-fork";
+    };
     ida-pro = {
       url = "git+http://192.168.1.117:3000/cattosmile/ida-pro-nix.git";
       inputs.nixpkgs.follows = "nixpkgs";

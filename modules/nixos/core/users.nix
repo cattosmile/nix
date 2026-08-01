@@ -5,7 +5,10 @@
 
   users.users.user = {
     isNormalUser = true;
-    extraGroups = [ "wheel" ];
+    extraGroups = [
+      "wheel"
+      "ydotool"
+    ];
     hashedPasswordFile = config.sops.secrets.user_password.path;
   };
 

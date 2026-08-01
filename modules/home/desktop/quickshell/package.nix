@@ -13,6 +13,7 @@ let
     mkdir -p "$out"
     cp ${./rice}/*.qml "$out/"
     cp -r ${./rice}/scripts "$out/scripts"
+    cp -r ${./rice}/assets "$out/assets"
     ln -s ${volumeTockPlayer} "$out/.volume-tock-player"
   '';
 

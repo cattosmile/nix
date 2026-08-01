@@ -17,6 +17,7 @@
     unstable.helvum
     prismlauncher
     vlc
+    unstable.rustdesk
   ];
 }
 

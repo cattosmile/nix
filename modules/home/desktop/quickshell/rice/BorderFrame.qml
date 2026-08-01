@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Wayland
 import QtQuick
 import Mono.Sdf.Rust
 
@@ -10,6 +11,20 @@ PanelWindow {
     required property real innerCornerSmoothness
     required property color borderColor
     readonly property real menuSurfaceOverlap: 2
+    readonly property alias launcherDismissalCaptureActive:
+        launcherMenu.dismissalCaptureActive
+
+    function closeLauncher() {
+        launcherMenu.requestClose();
+    }
+
+    function dismissLauncherFromPointer() {
+        launcherMenu.dismissFromPointer();
+    }
+
+    function handleLauncherKey(key, text, modifiers) {
+        return launcherMenu.handleExternalKey(key, text, modifiers);
+    }
 
     anchors {
         top: true
@@ -19,10 +34,19 @@ PanelWindow {
     }
 
     exclusionMode: ExclusionMode.Ignore
-    focusable: launcherMenu.keyboardActive
+    WlrLayershell.keyboardFocus: launcherMenu.keyboardActive
+        ? WlrKeyboardFocus.Exclusive
+        : WlrKeyboardFocus.None
     aboveWindows: true
     color: Theme.transparent
-    mask: Region {
+    // When the launcher is open, the transparent frame must receive clicks
+    // outside the panel so its dismissal MouseArea can close it. Otherwise
+    // keep the normal click-through mask for the islands and borders.
+    mask: launcherMenu.dismissalCaptureActive ? null : normalInputMask
+
+    Region {
+        id: normalInputMask
+
         item: workspaceIsland
         radius: workspaceIsland.radius
 
@@ -60,6 +84,7 @@ PanelWindow {
         Region {
             item: launcherMenu.interactionRegion
         }
+
     }
 
     GpuSdfCanvas {

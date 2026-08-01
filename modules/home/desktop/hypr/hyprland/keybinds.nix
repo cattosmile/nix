@@ -30,16 +30,16 @@ let
   alacritty = lib.getExe pkgs.alacritty;
   grim = lib.getExe pkgs.grim;
   nemo = lib.getExe pkgs.nemo-with-extensions;
-  rice = import ../../quickshell/package.nix {
-    inherit inputs lib pkgs;
-  };
+  liveRiceRoot = "/home/user/Projects/Quickshell Rice";
+  liveLauncherIpc = "${liveRiceRoot}/launcher-ipc.sh";
+  liveReload = "${liveRiceRoot}/reload-live.sh";
   quickshellLauncherToggle = lib.escapeShellArgs [
-    (lib.getExe rice.ipc)
+    liveLauncherIpc
     "call"
     "launcher"
     "toggle"
   ];
-  quickshellReload = lib.getExe rice.reload;
+  quickshellReload = lib.escapeShellArg liveReload;
   slurp = lib.getExe pkgs.slurp;
   swappy = lib.getExe pkgs.swappy;
   wlCopy = lib.getExe' pkgs.wl-clipboard "wl-copy";
