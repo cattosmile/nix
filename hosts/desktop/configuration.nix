@@ -32,13 +32,9 @@
     };
     initrd = {
       systemd.enable = true;
-      #  kernelModules = [
-      #    "dm_mod"
-      #    "dm-snapshot"
-      #    "dm_crypt"
-      #  ];
     };
   };
+
   hardware.enableAllFirmware = true;
 
   # Host specific SSH and RAM settings
@@ -61,8 +57,7 @@
 
   services.flatpak.enable = true;
 
-  # Keep AT-SPI enabled for graphical applications. The Computer Use daemon
-  # and its packages are managed by the user's Home Manager configuration.
+  # For Codex Computer Use
   services.gnome.at-spi2-core.enable = true;
 
   # System Version

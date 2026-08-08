@@ -25,17 +25,9 @@ let
     (lib.getExe clickAssistant)
     "toggle"
   ];
-  clickAssistantResizeTiled = lib.escapeShellArgs [
+  clickAssistantFloatingIpc = lib.escapeShellArgs [
     (lib.getExe clickAssistant)
-    "resize-start-tiled"
-  ];
-  clickAssistantResizeFloating = lib.escapeShellArgs [
-    (lib.getExe clickAssistant)
-    "resize-start-floating"
-  ];
-  clickAssistantResizeStop = lib.escapeShellArgs [
-    (lib.getExe clickAssistant)
-    "resize-stop"
+    "toggle-floating"
   ];
   slurp = lib.getExe pkgs.slurp;
   swappy = lib.getExe pkgs.swappy;
@@ -119,7 +111,7 @@ in
       {
         _args = [
           "SUPER + V"
-          (lib.generators.mkLuaInline ''hl.dsp.window.float({ action = "toggle" })'')
+          (lib.generators.mkLuaInline ''hl.dsp.exec_cmd([[${clickAssistantFloatingIpc}]])'')
         ];
       }
       {
@@ -208,25 +200,7 @@ in
       {
         _args = [
           "SUPER + mouse:273"
-          (lib.generators.mkLuaInline ''
-            (function()
-              local resizing = false
-              return function()
-                if resizing then
-                  resizing = false
-                  return hl.dispatch(hl.dsp.exec_cmd([[${clickAssistantResizeStop}]]))
-                end
-
-                resizing = true
-                local target = hl.get_active_window()
-                local command = target and target.floating
-                  and [[${clickAssistantResizeFloating}]]
-                  or [[${clickAssistantResizeTiled}]]
-                hl.dispatch(hl.dsp.exec_cmd(command))
-                return hl.dispatch(hl.dsp.window.resize())
-              end
-            end)()
-          '')
+          (lib.generators.mkLuaInline "hl.dsp.window.resize()")
           { mouse = true; }
         ];
       }

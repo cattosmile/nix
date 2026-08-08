@@ -10,8 +10,8 @@
 
   programs.codexDesktopLinux = {
     enable = true;
-    computerUseUi.enable = true; # default: false
-    remoteMobileControl.enable = true; # default: false
+    computerUseUi.enable = true;
+    remoteMobileControl.enable = true;
   };
 
   programs.codexComputerUse.enable = true;
@@ -25,4 +25,10 @@
       x = "omx --tmux --hotswap --madmax";
     };
   };
+}
+
+programs.nixslop = {
+  codex.enable = true;
+  codex desktop.enable 
+  omx.enable = true; 
 }

@@ -73,8 +73,8 @@
         ]
       },
       "locked": {
-        "lastModified": 1786172871,
-        "narHash": "sha256-bSP/KK2J7krEWvG5TnqXuJJW12z+cr2i8Hn6nN5XnrI=",
+        "lastModified": 1786208791,
+        "narHash": "sha256-NH5TFTJMnWfdQM1HbQU31Wizhd0xsF1KAYE3k/5e0qo=",
         "path": "/home/user/Projects/Assistant Thing",
         "type": "path"
       },
@@ -813,11 +813,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1786157508,
-        "narHash": "sha256-6KTX1K7l/8rkhpUXJ+WBf9HkMPgYa9/Kg+6JsKtNPZc=",
+        "lastModified": 1786178400,
+        "narHash": "sha256-KjGYaqo38BP11RHNUdgny3jWn0D/2LFMcPNX6IQmIlg=",
         "owner": "kaylorben",
         "repo": "nixcord",
-        "rev": "41c4f4eb01947d3e5b20ac9c39075bcc135b2355",
+        "rev": "c8f66f82fbe9cebf0c1deab6af402763335cded1",
         "type": "github"
       },
       "original": {
@@ -891,11 +891,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1785989512,
-        "narHash": "sha256-HFQhkQcl5D1hUNoen3SGHCSFCt2Bg6uP+HgbrnA3InQ=",
+        "lastModified": 1786089803,
+        "narHash": "sha256-ZuvZfVW2tB5tXYEcpcfhVXB3N4OhdZLOqOviy4OD4b4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "445d861c6d31b4af0c79d8d4be2331f762a361d7",
+        "rev": "ee48b147c18c7de1e6ec97dc74792be42724bed1",
         "type": "github"
       },
       "original": {
@@ -958,11 +958,11 @@
         "systems": "systems_4"
       },
       "locked": {
-        "lastModified": 1786156418,
-        "narHash": "sha256-GqPxbdw4vbZ06eaFEVXgJhJYJmxS6FsWK/P21Mn4ttw=",
+        "lastModified": 1786178326,
+        "narHash": "sha256-3cKr2uXUkcuy5m9Gq9NvhqRJRif+M1Ga62qmd4Mtd8k=",
         "owner": "cattosmile",
         "repo": "NixSlop",
-        "rev": "77a866f959eded45f474d7a7c8de8bec764d720c",
+        "rev": "f82e0a801ad24ca6eea8091bd62f1ec48a58681a",
         "type": "github"
       },
       "original": {
@@ -979,11 +979,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786161584,
-        "narHash": "sha256-I1l0rSd2DGD31scCTfW5n5996zpnkVZ2HEK3UmZfJcg=",
+        "lastModified": 1786208756,
+        "narHash": "sha256-palWNQTy+d5FKq+/8RvP9m5YjLOtFQA4JD2lsSQtL38=",
         "owner": "nix-community",
         "repo": "NUR",
-        "rev": "2b75f9b92fab46d97cecb37cd787d4f88333d253",
+        "rev": "441859cf5e45245f5f7f099c6044e0ed830855c1",
         "type": "github"
       },
       "original": {
@@ -1121,8 +1121,8 @@
         ]
       },
       "locked": {
-        "lastModified": 1786065206,
-        "narHash": "sha256-6Aqxn6osR9z3oFrrXIbfG81FaTkT/odHQUsgpQ1+LDM=",
+        "lastModified": 1786208572,
+        "narHash": "sha256-+jvWKa4SUH9NOmteKpvboLGwWgUokpoZ8teRStHt18A=",
         "path": "/home/user/Projects/Switcha",
         "type": "path"
       },

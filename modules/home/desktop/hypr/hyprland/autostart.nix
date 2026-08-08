@@ -37,9 +37,6 @@ in
       Restart = "on-failure";
       RestartSec = 1;
     };
-    Install = {
-      WantedBy = [ "graphical-session.target" ];
-    };
   };
 
   wayland.windowManager.hyprland.settings.on = [
@@ -52,7 +49,6 @@ in
             hl.exec_cmd([[${systemctl} --user import-environment WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE XDG_CURRENT_DESKTOP]])
             hl.exec_cmd([[${systemctl} --user start hyprpolkitagent]])
             hl.exec_cmd([[${quickshellStart}]])
-            hl.exec_cmd([[${systemctl} --user start click-assistant.service]])
             hl.exec_cmd([[${hyprctl} setcursor ${cursorArgs}]])
             hl.exec_cmd([[${systemctl} --user restart pipewire wireplumber pipewire-pulse]])
           end
