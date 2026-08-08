@@ -1,4 +1,5 @@
 {
+  config,
   hyprMonitors,
   inputs,
   lib,
@@ -12,11 +13,14 @@ let
   grim = lib.getExe pkgs.grim;
   nemo = lib.getExe pkgs.nemo-with-extensions;
   appLauncherToggle = lib.escapeShellArgs [
-    "/home/user/Projects/Quickshell Rice/launcher-ipc.sh"
+    (lib.getExe config.programs.quickshellRice.ipc)
     "call"
     "launcher"
     "toggle"
   ];
+  quickshellReload = lib.escapeShellArg (
+    lib.getExe config.programs.quickshellRice.reload
+  );
   clickAssistantIpc = lib.escapeShellArgs [
     (lib.getExe clickAssistant)
     "toggle"
@@ -84,6 +88,12 @@ in
         _args = [
           "SUPER + SPACE"
           (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${appLauncherToggle}]])")
+        ];
+      }
+      {
+        _args = [
+          "SUPER + SHIFT + R"
+          (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${quickshellReload}]])")
         ];
       }
       {
