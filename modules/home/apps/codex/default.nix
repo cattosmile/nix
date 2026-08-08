@@ -8,8 +8,15 @@
     inputs.nixslop.homeManagerModules.default
   ];
 
-  programs.codexDesktopLinux.enable = true;
-  programs.codexOmx.enable = true;
+  programs.codexDesktopLinux = {
+    enable = true;
+    computerUseUi.enable = true; # default: false
+    remoteMobileControl.enable = true; # default: false
+  };
+
+  programs.codexOmx = {
+    enable = true;
+  };
 
   programs.bash = {
     shellAliases = {

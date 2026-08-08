@@ -73,8 +73,8 @@
         ]
       },
       "locked": {
-        "lastModified": 1786158999,
-        "narHash": "sha256-YXx8qBE7ZulYE+GcxSVhaHPkJ0pXIbMFcOdmi7BBUfM=",
+        "lastModified": 1786172871,
+        "narHash": "sha256-bSP/KK2J7krEWvG5TnqXuJJW12z+cr2i8Hn6nN5XnrI=",
         "path": "/home/user/Projects/Assistant Thing",
         "type": "path"
       },
@@ -958,11 +958,11 @@
         "systems": "systems_4"
       },
       "locked": {
-        "lastModified": 1786157230,
-        "narHash": "sha256-9qbr+Xx9ReEGfbHYA6vK4lQgTOCGqsILZNgoJVAO9ys=",
+        "lastModified": 1786156418,
+        "narHash": "sha256-GqPxbdw4vbZ06eaFEVXgJhJYJmxS6FsWK/P21Mn4ttw=",
         "owner": "cattosmile",
         "repo": "NixSlop",
-        "rev": "802f43ed2695a16825a72386599ed4e9da66ea83",
+        "rev": "77a866f959eded45f474d7a7c8de8bec764d720c",
         "type": "github"
       },
       "original": {
@@ -979,11 +979,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786157825,
-        "narHash": "sha256-bIsxrU17p5RVNYiP69i5kiOR9etrJh8kfl78CFD8WL4=",
+        "lastModified": 1786161584,
+        "narHash": "sha256-I1l0rSd2DGD31scCTfW5n5996zpnkVZ2HEK3UmZfJcg=",
         "owner": "nix-community",
         "repo": "NUR",
-        "rev": "c1f0001168e2f3f1d45af015e227183d688ca200",
+        "rev": "2b75f9b92fab46d97cecb37cd787d4f88333d253",
         "type": "github"
       },
       "original": {
@@ -1014,6 +1014,26 @@
         "type": "github"
       }
     },
+    "quickshell": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1785704021,
+        "narHash": "sha256-eQtczKMAS4ItlB4pr1B3MqBZiyRVl2nkqNdtyRSQMa8=",
+        "ref": "refs/heads/master",
+        "rev": "28771c7c74b42e20afca0b1b63980cb46515537c",
+        "revCount": 835,
+        "type": "git",
+        "url": "https://git.outfoxxed.me/outfoxxed/quickshell"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://git.outfoxxed.me/outfoxxed/quickshell"
+      }
+    },
     "root": {
       "inputs": {
         "click-assistant": "click-assistant",
@@ -1028,6 +1048,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixslop": "nixslop",
         "nur": "nur",
+        "quickshell": "quickshell",
         "sls-steam": "sls-steam",
         "sops-nix": "sops-nix",
         "spicetify-nix": "spicetify-nix",

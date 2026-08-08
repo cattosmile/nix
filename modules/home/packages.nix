@@ -19,6 +19,7 @@
     vlc
     unstable.rustdesk
     inputs.switcha.packages.${pkgs.stdenv.hostPlatform.system}.default
+    inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 }
 

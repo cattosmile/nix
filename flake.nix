@@ -28,6 +28,10 @@
       url = "github:kaylorben/nixcord";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    quickshell = {
+      url = "git+https://git.outfoxxed.me/outfoxxed/quickshell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     spicetify-nix.url = "github:Gerg-L/spicetify-nix";
     nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=latest";
     sls-steam = {

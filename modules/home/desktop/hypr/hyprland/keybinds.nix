@@ -11,9 +11,27 @@ let
   clickAssistant = inputs.click-assistant.packages.${pkgs.stdenv.hostPlatform.system}.default;
   grim = lib.getExe pkgs.grim;
   nemo = lib.getExe pkgs.nemo-with-extensions;
+  appLauncherToggle = lib.escapeShellArgs [
+    "/home/user/Projects/Quickshell Rice/launcher-ipc.sh"
+    "call"
+    "launcher"
+    "toggle"
+  ];
   clickAssistantIpc = lib.escapeShellArgs [
     (lib.getExe clickAssistant)
     "toggle"
+  ];
+  clickAssistantResizeTiled = lib.escapeShellArgs [
+    (lib.getExe clickAssistant)
+    "resize-start-tiled"
+  ];
+  clickAssistantResizeFloating = lib.escapeShellArgs [
+    (lib.getExe clickAssistant)
+    "resize-start-floating"
+  ];
+  clickAssistantResizeStop = lib.escapeShellArgs [
+    (lib.getExe clickAssistant)
+    "resize-stop"
   ];
   slurp = lib.getExe pkgs.slurp;
   swappy = lib.getExe pkgs.swappy;
@@ -60,6 +78,12 @@ in
         _args = [
           "SUPER + E"
           (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${nemo}", { float = true, center = true, size = "1000 600", monitor = "${hyprMonitors.primary}" })'')
+        ];
+      }
+      {
+        _args = [
+          "SUPER + SPACE"
+          (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${appLauncherToggle}]])")
         ];
       }
       {
@@ -174,7 +198,25 @@ in
       {
         _args = [
           "SUPER + mouse:273"
-          (lib.generators.mkLuaInline "hl.dsp.window.resize()")
+          (lib.generators.mkLuaInline ''
+            (function()
+              local resizing = false
+              return function()
+                if resizing then
+                  resizing = false
+                  return hl.dispatch(hl.dsp.exec_cmd([[${clickAssistantResizeStop}]]))
+                end
+
+                resizing = true
+                local target = hl.get_active_window()
+                local command = target and target.floating
+                  and [[${clickAssistantResizeFloating}]]
+                  or [[${clickAssistantResizeTiled}]]
+                hl.dispatch(hl.dsp.exec_cmd(command))
+                return hl.dispatch(hl.dsp.window.resize())
+              end
+            end)()
+          '')
           { mouse = true; }
         ];
       }
