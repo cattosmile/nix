@@ -8,16 +8,14 @@
     inputs.nixslop.homeManagerModules.default
   ];
 
-  programs.codexDesktopLinux = {
-    enable = true;
-    computerUseUi.enable = true;
-    remoteMobileControl.enable = true;
-  };
-
-  programs.codexComputerUse.enable = true;
-
-  programs.codexOmx = {
-    enable = true;
+  programs.nixslop = {
+    codex.enable = true;
+    desktop = {
+      enable = true;
+      computerUseUi.enable = true;
+      remoteMobileControl.enable = true;
+    };
+    computerUse.enable = true;
   };
 
   programs.bash = {
@@ -25,10 +23,4 @@
       x = "omx --tmux --hotswap --madmax";
     };
   };
-}
-
-programs.nixslop = {
-  codex.enable = true;
-  codex desktop.enable 
-  omx.enable = true; 
 }

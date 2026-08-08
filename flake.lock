@@ -958,11 +958,11 @@
         "systems": "systems_4"
       },
       "locked": {
-        "lastModified": 1786178326,
-        "narHash": "sha256-3cKr2uXUkcuy5m9Gq9NvhqRJRif+M1Ga62qmd4Mtd8k=",
+        "lastModified": 1786209491,
+        "narHash": "sha256-7uumaW1GNyO9I7NCy1M6PIy5B754UmnOxMh2inTzU+s=",
         "owner": "cattosmile",
         "repo": "NixSlop",
-        "rev": "f82e0a801ad24ca6eea8091bd62f1ec48a58681a",
+        "rev": "9a0e228490a22929c98658d558942dbb7dc02052",
         "type": "github"
       },
       "original": {
