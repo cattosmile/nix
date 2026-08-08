@@ -14,6 +14,8 @@
     remoteMobileControl.enable = true; # default: false
   };
 
+  programs.codexComputerUse.enable = true;
+
   programs.codexOmx = {
     enable = true;
   };
