@@ -1,4 +1,5 @@
 {
+  inputs,
   pkgs,
   ...
 }:
@@ -7,6 +8,7 @@
   imports = [
     ./hardware-configuration.nix
     ../../modules/nixos
+    inputs.nixslop.nixosModules.codexComputerUse
     ../../home/users/user
     ./disko.nix
   ];
@@ -60,6 +62,11 @@
   ];
 
   services.flatpak.enable = true;
+
+  services.codexComputerUse = {
+    enable = true;
+    user = "user";
+  };
 
   # System Version
   system.stateVersion = "26.05"; # Did you read the comment?

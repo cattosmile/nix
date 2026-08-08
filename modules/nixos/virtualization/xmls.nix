@@ -1,6 +1,9 @@
 { pkgs, lib, ... }:
 
 let
+  evsieveGuestKeyboard = "/dev/input/by-id/evsieve-guest-keyboard";
+  evsieveGuestMouse = "/dev/input/by-id/evsieve-guest-mouse";
+
   vms = {
     win10-nvme = ''
       <domain xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0" type="kvm">
@@ -260,9 +263,9 @@ let
         </devices>
         <qemu:commandline>
           <qemu:arg value="-object"/>
-          <qemu:arg value="input-linux,id=mouse1,evdev=/dev/input/by-id/usb-Logitech_USB_Receiver-event-mouse"/>
+          <qemu:arg value="input-linux,id=mouse1,evdev=${evsieveGuestMouse}"/>
           <qemu:arg value="-object"/>
-          <qemu:arg value="input-linux,id=kbd1,evdev=/dev/input/by-id/usb-Lenovo_Lenovo_Traditional_USB_Keyboard-event-kbd,grab_all=on,repeat=on,grab-toggle=ctrl-ctrl"/>
+          <qemu:arg value="input-linux,id=kbd1,evdev=${evsieveGuestKeyboard},grab_all=on,repeat=on"/>
           <qemu:arg value="-device"/>
           <qemu:arg value="{'driver':'ivshmem-plain','id':'shmem0','memdev':'looking-glass'}"/>
           <qemu:arg value="-object"/>
@@ -280,9 +283,9 @@ let
               <libosinfo:os id="http://microsoft.com/win/10"/>
             </libosinfo:libosinfo>
           </metadata>
-          <memory unit="KiB">16777216</memory>
-          <currentMemory unit="KiB">16777216</currentMemory>
-          <vcpu placement="static">12</vcpu>
+          <memory unit="KiB">8388608</memory>
+          <currentMemory unit="KiB">8388608</currentMemory>
+          <vcpu placement="static">6</vcpu>
           <cputune>
             <vcpupin vcpu="0" cpuset="0"/>
             <vcpupin vcpu="1" cpuset="1"/>
@@ -290,12 +293,6 @@ let
             <vcpupin vcpu="3" cpuset="3"/>
             <vcpupin vcpu="4" cpuset="4"/>
             <vcpupin vcpu="5" cpuset="5"/>
-            <vcpupin vcpu="6" cpuset="6"/>
-            <vcpupin vcpu="7" cpuset="7"/>
-            <vcpupin vcpu="8" cpuset="8"/>
-            <vcpupin vcpu="9" cpuset="9"/>
-            <vcpupin vcpu="10" cpuset="10"/>
-            <vcpupin vcpu="11" cpuset="11"/>
           </cputune>
           <sysinfo type="smbios">
             <bios>
@@ -359,7 +356,7 @@ let
             <smm state="on"/>
           </features>
           <cpu mode="host-passthrough" check="none" migratable="on">
-            <topology sockets="1" dies="1" clusters="1" cores="6" threads="2"/>
+            <topology sockets="1" dies="1" clusters="1" cores="3" threads="2"/>
             <cache mode="passthrough"/>
             <feature policy="disable" name="hypervisor"/>
           </cpu>
@@ -528,9 +525,9 @@ let
           </devices>
           <qemu:commandline>
             <qemu:arg value="-object"/>
-            <qemu:arg value="input-linux,id=mouse1,evdev=/dev/input/by-id/usb-Logitech_USB_Receiver-event-mouse"/>
+            <qemu:arg value="input-linux,id=mouse1,evdev=${evsieveGuestMouse}"/>
             <qemu:arg value="-object"/>
-            <qemu:arg value="input-linux,id=kbd1,evdev=/dev/input/by-id/usb-Lenovo_Lenovo_Traditional_USB_Keyboard-event-kbd,grab_all=on,repeat=on,grab-toggle=ctrl-ctrl"/>
+            <qemu:arg value="input-linux,id=kbd1,evdev=${evsieveGuestKeyboard},grab_all=on,repeat=on"/>
             <qemu:arg value="-device"/>
             <qemu:arg value="{'driver':'ivshmem-plain','id':'shmem0','memdev':'looking-glass'}"/>
             <qemu:arg value="-object"/>
@@ -549,10 +546,12 @@ let
       after = [
         "libvirtd.service"
         "libvirtd-config.service"
+        "evsieve-vfio-input.service"
       ];
       requires = [
         "libvirtd.service"
         "libvirtd-config.service"
+        "evsieve-vfio-input.service"
       ];
       path = [ pkgs.libvirt ];
 

@@ -255,9 +255,9 @@
   </devices>
   <qemu:commandline>
     <qemu:arg value="-object"/>
-    <qemu:arg value="input-linux,id=mouse1,evdev=/dev/input/by-id/usb-Logitech_USB_Receiver-event-mouse"/>
+    <qemu:arg value="input-linux,id=mouse1,evdev=/dev/input/by-id/evsieve-guest-mouse"/>
     <qemu:arg value="-object"/>
-    <qemu:arg value="input-linux,id=kbd1,evdev=/dev/input/by-id/usb-Lenovo_Lenovo_Traditional_USB_Keyboard-event-kbd,grab_all=on,repeat=on,grab-toggle=ctrl-ctrl"/>
+    <qemu:arg value="input-linux,id=kbd1,evdev=/dev/input/by-id/evsieve-guest-keyboard,grab_all=on,repeat=on"/>
     <qemu:arg value="-device"/>
     <qemu:arg value="{'driver':'ivshmem-plain','id':'shmem0','memdev':'looking-glass'}"/>
     <qemu:arg value="-object"/>

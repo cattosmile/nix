@@ -33,9 +33,6 @@
   programs.nix-ld.enable = true;
   services.fwupd.enable = true;
 
-  # Codex Computer Use input backend.
-  programs.ydotool.enable = true;
-
   security.pki.certificateFiles = [
     ./root_ca.crt
   ];

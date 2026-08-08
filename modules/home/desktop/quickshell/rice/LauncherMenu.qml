@@ -19,6 +19,22 @@ Item {
     readonly property real surfaceInset: 16
     readonly property real searchCornerRadius:
         Math.max(0, surfaceCornerRadius - surfaceInset)
+    // Keep the entire query inside the search field.  Iosevka is monospaced,
+    // so measuring one representative glyph gives us a stable character
+    // budget that prevents TextInput from horizontally scrolling the leading
+    // `>` out of view.
+    readonly property real searchTextWidth:
+        surfaceWidth - 2 * surfaceInset - 32
+    readonly property real searchCharacterWidth:
+        Math.max(1, searchTextMetrics.advanceWidth)
+    readonly property int searchMaximumLength:
+        Math.max(
+            1,
+            Math.floor(
+                Math.max(0, searchTextWidth)
+                    / searchCharacterWidth
+            )
+        )
     readonly property real surfaceX: (width - surfaceWidth) / 2
     readonly property real visibleY: borderThickness - 2
     readonly property real hiddenY: -surfaceHeight - 4
@@ -26,12 +42,20 @@ Item {
         virtualMachineConfirmationEntry !== null
     readonly property bool virtualMachineQueryMode:
         isVirtualMachineQuery(searchInput.text)
+    readonly property bool systemCommandMode:
+        isSystemCommandQuery(searchInput.text)
+    readonly property bool calculatorMode:
+        isCalculatorQuery(searchInput.text)
     readonly property bool virtualMachineMode:
         virtualMachineShutdownMode || virtualMachineQueryMode
     readonly property var results: virtualMachineShutdownMode
         ? virtualMachineConfirmationOptions
         : virtualMachineQueryMode
         ? virtualMachineEntries
+        : systemCommandMode
+        ? systemCommandResults
+        : calculatorMode
+        ? calculatorResults
         : searchApplications()
     readonly property real targetSurfaceHeight:
         baseSurfaceHeight + results.length * resultRowStep
@@ -55,8 +79,38 @@ Item {
     property string virtualMachineQueryText: ""
     readonly property var virtualMachineConfirmationOptions: [
         { name: "Yes", action: "shutdown" },
-        { name: "No", action: "cancel" }
+        { name: "No", action: "cancel" },
+        { name: "Force Shut Off", action: "forceShutdown" }
     ]
+    readonly property var systemCommandDefinitions: [
+        {
+            name: "Shutdown",
+            command: "shutdown",
+            glyph: "\uf011"
+        },
+        {
+            name: "Reboot",
+            command: "reboot",
+            glyph: "\uf2f1"
+        },
+        {
+            name: "Log out",
+            command: "logout",
+            glyph: "\uf2f5"
+        }
+    ]
+    readonly property var systemCommandResults: systemCommandEntries()
+    readonly property var calculatorResults: calculatorEntries()
+
+    TextMetrics {
+        id: searchTextMetrics
+
+        font {
+            family: "Iosevka"
+            pixelSize: 16
+        }
+        text: "0"
+    }
 
     IpcHandler {
         target: "launcher"
@@ -119,6 +173,674 @@ Item {
         return term.length >= 3 && "windows".startsWith(term);
     }
 
+    function isSystemCommandQuery(rawQuery) {
+        const query = String(rawQuery || "").trim().toLocaleLowerCase();
+
+        if (!query.startsWith(">"))
+            return false;
+
+        const term = query.slice(1).trim();
+
+        // Keep the command mode restricted to the three fixed host actions.
+        // An empty term is useful as a small discoverable command list, while
+        // arbitrary input such as >shutdown-now never becomes executable.
+        return term.length === 0
+            || systemCommandDefinitions.some(
+                definition => definition.command.startsWith(term)
+            );
+    }
+
+    function systemCommandEntries() {
+        const query = String(searchInput.text || "")
+            .trim()
+            .toLocaleLowerCase();
+        const term = query.startsWith(">")
+            ? query.slice(1).trim()
+            : "";
+
+        return systemCommandDefinitions.filter(
+            definition => term.length === 0
+                || definition.command.startsWith(term)
+        );
+    }
+
+    function calculatorExpression(rawQuery) {
+        const query = String(rawQuery || "").trim();
+
+        if (!query.startsWith(">"))
+            return "";
+
+        return query.slice(1)
+            .replace(/\s+/g, "")
+            .replace(/×/g, "*")
+            .replace(/÷/g, "/")
+            .replace(/,/g, ".");
+    }
+
+    function normalizeInteger(value) {
+        let text = String(value || "");
+        let negative = false;
+
+        if (text[0] === "-" || text[0] === "+") {
+            negative = text[0] === "-";
+            text = text.slice(1);
+        }
+
+        let firstDigit = 0;
+
+        while (firstDigit < text.length - 1 && text[firstDigit] === "0")
+            firstDigit += 1;
+
+        text = text.slice(firstDigit) || "0";
+
+        if (text === "0")
+            return "0";
+
+        return negative ? "-" + text : text;
+    }
+
+    function integerAbs(value) {
+        const text = normalizeInteger(value);
+        return text[0] === "-" ? text.slice(1) : text;
+    }
+
+    function integerNegative(value) {
+        return normalizeInteger(value)[0] === "-";
+    }
+
+    function compareIntegerAbs(left, right) {
+        const leftAbs = integerAbs(left);
+        const rightAbs = integerAbs(right);
+
+        if (leftAbs.length !== rightAbs.length)
+            return leftAbs.length < rightAbs.length ? -1 : 1;
+
+        if (leftAbs === rightAbs)
+            return 0;
+
+        return leftAbs < rightAbs ? -1 : 1;
+    }
+
+    function addIntegerAbs(left, right) {
+        let leftIndex = left.length - 1;
+        let rightIndex = right.length - 1;
+        let carry = 0;
+        let result = "";
+
+        while (leftIndex >= 0 || rightIndex >= 0 || carry > 0) {
+            const leftDigit = leftIndex >= 0
+                ? Number(left[leftIndex--])
+                : 0;
+            const rightDigit = rightIndex >= 0
+                ? Number(right[rightIndex--])
+                : 0;
+            const sum = leftDigit + rightDigit + carry;
+
+            result = String(sum % 10) + result;
+            carry = Math.floor(sum / 10);
+        }
+
+        return normalizeInteger(result);
+    }
+
+    function subtractIntegerAbs(left, right) {
+        // This helper expects |left| >= |right|.
+        let leftIndex = left.length - 1;
+        let rightIndex = right.length - 1;
+        let borrow = 0;
+        let result = "";
+
+        while (leftIndex >= 0) {
+            let difference = Number(left[leftIndex--]) - borrow;
+
+            if (rightIndex >= 0)
+                difference -= Number(right[rightIndex--]);
+
+            if (difference < 0) {
+                difference += 10;
+                borrow = 1;
+            } else {
+                borrow = 0;
+            }
+
+            result = String(difference) + result;
+        }
+
+        return normalizeInteger(result);
+    }
+
+    function addInteger(left, right) {
+        const leftValue = normalizeInteger(left);
+        const rightValue = normalizeInteger(right);
+        const leftNegative = integerNegative(leftValue);
+        const rightNegative = integerNegative(rightValue);
+        const leftAbs = integerAbs(leftValue);
+        const rightAbs = integerAbs(rightValue);
+
+        if (leftNegative === rightNegative) {
+            const sum = addIntegerAbs(leftAbs, rightAbs);
+            return leftNegative && sum !== "0" ? "-" + sum : sum;
+        }
+
+        const comparison = compareIntegerAbs(leftAbs, rightAbs);
+
+        if (comparison === 0)
+            return "0";
+
+        if (comparison > 0) {
+            const difference = subtractIntegerAbs(leftAbs, rightAbs);
+            return leftNegative ? "-" + difference : difference;
+        }
+
+        const difference = subtractIntegerAbs(rightAbs, leftAbs);
+        return rightNegative ? "-" + difference : difference;
+    }
+
+    function negateInteger(value) {
+        const normalized = normalizeInteger(value);
+        return normalized === "0"
+            ? "0"
+            : integerNegative(normalized)
+            ? normalized.slice(1)
+            : "-" + normalized;
+    }
+
+    function multiplyInteger(left, right) {
+        const leftValue = normalizeInteger(left);
+        const rightValue = normalizeInteger(right);
+        const leftAbs = integerAbs(leftValue);
+        const rightAbs = integerAbs(rightValue);
+
+        if (leftAbs === "0" || rightAbs === "0")
+            return "0";
+
+        const digits = [];
+
+        for (let index = 0; index < leftAbs.length + rightAbs.length; index += 1)
+            digits.push(0);
+
+        for (let leftIndex = leftAbs.length - 1;
+                leftIndex >= 0;
+                leftIndex -= 1) {
+            let carry = 0;
+
+            for (let rightIndex = rightAbs.length - 1;
+                    rightIndex >= 0;
+                    rightIndex -= 1) {
+                const index = leftIndex + rightIndex + 1;
+                const product = Number(leftAbs[leftIndex])
+                    * Number(rightAbs[rightIndex])
+                    + digits[index]
+                    + carry;
+
+                digits[index] = product % 10;
+                carry = Math.floor(product / 10);
+            }
+
+            digits[leftIndex] += carry;
+        }
+
+        const product = normalizeInteger(digits.join(""));
+        return integerNegative(leftValue) !== integerNegative(rightValue)
+            ? "-" + product
+            : product;
+    }
+
+    function divideIntegerAbs(dividend, divisor) {
+        const normalizedDivisor = normalizeInteger(divisor);
+
+        if (normalizedDivisor === "0")
+            return null;
+
+        let quotient = "";
+        let remainder = "0";
+
+        for (let index = 0; index < dividend.length; index += 1) {
+            remainder = normalizeInteger(
+                remainder === "0"
+                    ? dividend[index]
+                    : remainder + dividend[index]
+            );
+
+            let quotientDigit = 0;
+
+            while (compareIntegerAbs(remainder, normalizedDivisor) >= 0) {
+                remainder = subtractIntegerAbs(
+                    remainder,
+                    normalizedDivisor
+                );
+                quotientDigit += 1;
+            }
+
+            quotient += String(quotientDigit);
+        }
+
+        return {
+            quotient: normalizeInteger(quotient),
+            remainder: normalizeInteger(remainder)
+        };
+    }
+
+    function divideInteger(left, right) {
+        const leftValue = normalizeInteger(left);
+        const rightValue = normalizeInteger(right);
+        const division = divideIntegerAbs(
+            integerAbs(leftValue),
+            integerAbs(rightValue)
+        );
+
+        if (division === null)
+            return null;
+
+        const quotient = division.quotient === "0"
+            || integerNegative(leftValue) === integerNegative(rightValue)
+            ? division.quotient
+            : "-" + division.quotient;
+        const remainder = integerNegative(leftValue)
+            && division.remainder !== "0"
+            ? "-" + division.remainder
+            : division.remainder;
+
+        return { quotient: quotient, remainder: remainder };
+    }
+
+    function powerInteger(base, exponent) {
+        const exponentNumber = Number(exponent);
+
+        if (integerNegative(exponent)
+                || !isFinite(exponentNumber)
+                || exponentNumber < 0
+                || exponentNumber > 1000
+                || Math.floor(exponentNumber) !== exponentNumber)
+            return null;
+
+        let result = "1";
+        let factor = normalizeInteger(base);
+        let remaining = exponentNumber;
+
+        while (remaining > 0) {
+            if (remaining % 2 === 1)
+                result = multiplyInteger(result, factor);
+
+            remaining = Math.floor(remaining / 2);
+
+            if (remaining > 0)
+                factor = multiplyInteger(factor, factor);
+        }
+
+        return result;
+    }
+
+    function calculateIntegerExpression(rawQuery) {
+        const expression = calculatorExpression(rawQuery);
+
+        if (expression.length === 0
+                || expression.length > 80
+                || !/^[0-9.+\-*/%^()]+$/.test(expression)
+                || expression.indexOf(".") >= 0)
+            return null;
+
+        let cursor = 0;
+
+        function parseNumber() {
+            const match = expression.slice(cursor).match(/^\d+/);
+
+            if (!match)
+                return null;
+
+            cursor += match[0].length;
+            return normalizeInteger(match[0]);
+        }
+
+        function parsePrimary() {
+            if (expression[cursor] === "(") {
+                cursor += 1;
+                const value = parseAddSub();
+
+                if (value === null || expression[cursor] !== ")")
+                    return null;
+
+                cursor += 1;
+                return value;
+            }
+
+            return parseNumber();
+        }
+
+        function parsePower() {
+            const value = parsePrimary();
+
+            if (value === null)
+                return null;
+
+            if (expression[cursor] !== "^")
+                return value;
+
+            cursor += 1;
+            const exponent = parseUnary();
+
+            if (exponent === null)
+                return null;
+
+            return powerInteger(value, exponent);
+        }
+
+        function parseUnary() {
+            const operator = expression[cursor];
+
+            if (operator === "+" || operator === "-") {
+                cursor += 1;
+                const value = parseUnary();
+
+                if (value === null)
+                    return null;
+
+                return operator === "-" ? negateInteger(value) : value;
+            }
+
+            return parsePower();
+        }
+
+        function parseMultiplyDivide() {
+            let value = parseUnary();
+
+            if (value === null)
+                return null;
+
+            while (expression[cursor] === "*"
+                    || expression[cursor] === "/"
+                    || expression[cursor] === "%") {
+                const operator = expression[cursor++];
+                const right = parseUnary();
+
+                if (right === null)
+                    return null;
+
+                if (operator === "*") {
+                    value = multiplyInteger(value, right);
+                } else {
+                    const division = divideInteger(value, right);
+
+                    if (division === null)
+                        return null;
+
+                    if (operator === "/") {
+                        // Let the decimal parser handle non-integer division.
+                        if (division.remainder !== "0")
+                            return null;
+
+                        value = division.quotient;
+                    } else {
+                        value = division.remainder;
+                    }
+                }
+            }
+
+            return value;
+        }
+
+        function parseAddSub() {
+            let value = parseMultiplyDivide();
+
+            if (value === null)
+                return null;
+
+            while (expression[cursor] === "+"
+                    || expression[cursor] === "-") {
+                const operator = expression[cursor++];
+                const right = parseMultiplyDivide();
+
+                if (right === null)
+                    return null;
+
+                value = operator === "+"
+                    ? addInteger(value, right)
+                    : addInteger(value, negateInteger(right));
+            }
+
+            return value;
+        }
+
+        const result = parseAddSub();
+
+        return result !== null && cursor === expression.length
+            ? result
+            : null;
+    }
+
+    function calculateExpression(rawQuery) {
+        const expression = calculatorExpression(rawQuery);
+
+        if (expression.length === 0
+                || expression.length > 80
+                || !/^[0-9.+\-*/%^()]+$/.test(expression))
+            return null;
+
+        let cursor = 0;
+
+        function parseNumber() {
+            const match = expression.slice(cursor).match(
+                /^(?:\d+(?:\.\d*)?|\.\d+)/
+            );
+
+            if (!match)
+                return null;
+
+            cursor += match[0].length;
+            const value = Number(match[0]);
+            return isFinite(value) ? value : null;
+        }
+
+        function parsePrimary() {
+            if (expression[cursor] === "(") {
+                cursor += 1;
+                const value = parseAddSub();
+
+                if (value === null || expression[cursor] !== ")")
+                    return null;
+
+                cursor += 1;
+                return value;
+            }
+
+            return parseNumber();
+        }
+
+        function parsePower() {
+            const value = parsePrimary();
+
+            if (value === null)
+                return null;
+
+            if (expression[cursor] !== "^")
+                return value;
+
+            cursor += 1;
+            const exponent = parseUnary();
+
+            if (exponent === null)
+                return null;
+
+            const powered = Math.pow(value, exponent);
+            return isFinite(powered) ? powered : null;
+        }
+
+        function parseUnary() {
+            const operator = expression[cursor];
+
+            if (operator === "+" || operator === "-") {
+                cursor += 1;
+                const value = parseUnary();
+
+                if (value === null)
+                    return null;
+
+                return operator === "-" ? -value : value;
+            }
+
+            return parsePower();
+        }
+
+        function parseMultiplyDivide() {
+            let value = parseUnary();
+
+            if (value === null)
+                return null;
+
+            while (expression[cursor] === "*"
+                    || expression[cursor] === "/"
+                    || expression[cursor] === "%") {
+                const operator = expression[cursor++];
+                const right = parseUnary();
+
+                if (right === null
+                        || ((operator === "/" || operator === "%")
+                            && right === 0))
+                    return null;
+
+                if (operator === "*")
+                    value *= right;
+                else if (operator === "/")
+                    value /= right;
+                else
+                    value %= right;
+
+                if (!isFinite(value))
+                    return null;
+            }
+
+            return value;
+        }
+
+        function parseAddSub() {
+            let value = parseMultiplyDivide();
+
+            if (value === null)
+                return null;
+
+            while (expression[cursor] === "+"
+                    || expression[cursor] === "-") {
+                const operator = expression[cursor++];
+                const right = parseMultiplyDivide();
+
+                if (right === null)
+                    return null;
+
+                value = operator === "+"
+                    ? value + right
+                    : value - right;
+
+                if (!isFinite(value))
+                    return null;
+            }
+
+            return value;
+        }
+
+        const result = parseAddSub();
+
+        if (result === null || cursor !== expression.length)
+            return null;
+
+        return isFinite(result) ? result : null;
+    }
+
+    function isCalculatorQuery(rawQuery) {
+        const query = String(rawQuery || "").trim();
+
+        if (!query.startsWith(">")
+                || isVirtualMachineQuery(query)
+                || isSystemCommandQuery(query))
+            return false;
+
+        return calculateIntegerExpression(query) !== null
+            || calculateExpression(query) !== null;
+    }
+
+    function calculatorEntries() {
+        const exactValue = calculateIntegerExpression(searchInput.text);
+
+        if (exactValue !== null) {
+            return [{
+                name: exactValue,
+                calculator: true,
+                glyph: "\uf52c"
+            }];
+        }
+
+        const value = calculateExpression(searchInput.text);
+
+        if (value === null)
+            return [];
+
+        return [{
+            name: formatCalculatorResult(value),
+            calculator: true,
+            glyph: "\uf52c"
+        }];
+    }
+
+    function formatCalculatorResult(value) {
+        if (!isFinite(value))
+            return "";
+
+        // Keep ordinary decimal calculations readable while retaining the
+        // full finite value for large results. Expand scientific notation so
+        // the launcher never shows an e+ exponent in the result row.
+        const normalized = Math.abs(value) < 1e21
+            ? Number(value.toPrecision(15))
+            : value;
+        return expandScientificNotation(String(normalized));
+    }
+
+    function expandScientificNotation(value) {
+        const text = String(value).toLocaleLowerCase();
+        const exponentMarker = text.indexOf("e");
+
+        if (exponentMarker < 0)
+            return text;
+
+        const exponent = Number(text.slice(exponentMarker + 1));
+
+        if (!isFinite(exponent))
+            return text;
+
+        let coefficient = text.slice(0, exponentMarker);
+        let sign = "";
+
+        if (coefficient[0] === "-" || coefficient[0] === "+") {
+            sign = coefficient[0] === "-" ? "-" : "";
+            coefficient = coefficient.slice(1);
+        }
+
+        const decimalPoint = coefficient.indexOf(".");
+        const integerDigits = decimalPoint < 0
+            ? coefficient.length
+            : decimalPoint;
+        const digits = coefficient.replace(".", "");
+        const decimalPosition = integerDigits + exponent;
+
+        function zeros(count) {
+            let result = "";
+
+            for (let index = 0; index < count; index += 1)
+                result += "0";
+
+            return result;
+        }
+
+        if (decimalPosition <= 0)
+            return sign + "0." + zeros(-decimalPosition) + digits;
+
+        if (decimalPosition >= digits.length)
+            return sign + digits + zeros(decimalPosition - digits.length);
+
+        return sign
+            + digits.slice(0, decimalPosition)
+            + "."
+            + digits.slice(decimalPosition);
+    }
+
     function virtualMachineStateIcon(state) {
         const normalized = String(state || "unknown").trim().toLocaleLowerCase();
 
@@ -133,10 +855,9 @@ Item {
     }
 
     function virtualMachineIconPath(entry) {
-        // virt-manager's manager view uses the 32px status artwork from its
-        // own installed package.  The VM helper resolves that path for every
-        // refresh; keep the bundled copy only as a safe fallback when the
-        // package is temporarily unavailable.
+        // virt-manager's manager view asks GTK for state_* status icons.  The
+        // VM helper resolves the active GTK theme path for every refresh, so
+        // this uses the same Papirus-Dark artwork as the native VMM list.
         const installedIconPath = String(entry && entry.iconPath || "")
             .trim();
 
@@ -250,10 +971,20 @@ Item {
         if (virtualMachineShutdownMode) {
             if (entry.action === "shutdown")
                 confirmVirtualMachineShutdown();
+            else if (entry.action === "forceShutdown")
+                forceVirtualMachineShutdown();
             else
                 cancelVirtualMachineShutdown();
             return;
         }
+
+        if (systemCommandMode) {
+            launchSystemCommand(entry.command);
+            return;
+        }
+
+        if (calculatorMode)
+            return;
 
         if (virtualMachineQueryMode) {
             if (virtualMachineIsRunning(entry)) {
@@ -292,6 +1023,22 @@ Item {
         requestClose();
     }
 
+    function launchSystemCommand(command) {
+        const allowed = systemCommandDefinitions.some(
+            definition => definition.command === command
+        );
+
+        if (!allowed)
+            return;
+
+        Quickshell.execDetached([
+            "bash",
+            Quickshell.shellPath("scripts/system-command.sh"),
+            command
+        ]);
+        requestClose();
+    }
+
     function requestVirtualMachineShutdown(entry) {
         virtualMachineQueryText = searchInput.text;
         virtualMachineConfirmationEntry = entry;
@@ -322,6 +1069,22 @@ Item {
         Quickshell.execDetached([
             "bash",
             Quickshell.shellPath("scripts/shutdown-virtual-machine.sh"),
+            entry.name
+        ]);
+        virtualMachineConfirmationEntry = null;
+        requestClose();
+    }
+
+    function forceVirtualMachineShutdown() {
+        const entry = virtualMachineConfirmationEntry;
+
+        if (!entry)
+            return;
+
+        Quickshell.execDetached([
+            "bash",
+            Quickshell.shellPath("scripts/shutdown-virtual-machine.sh"),
+            "--force",
             entry.name
         ]);
         virtualMachineConfirmationEntry = null;
@@ -468,8 +1231,17 @@ Item {
             | Qt.MetaModifier;
 
         if (text && !(modifiers & navigationModifiers)) {
-            searchInput.insert(searchInput.cursorPosition, text);
-            searchInput.cursorPosition += text.length;
+            const remaining = searchInput.maximumLength
+                - searchInput.length;
+            const insertion = String(text).slice(
+                0,
+                Math.max(0, remaining)
+            );
+
+            if (insertion.length > 0) {
+                searchInput.insert(searchInput.cursorPosition, insertion);
+                searchInput.cursorPosition += insertion.length;
+            }
             return true;
         }
 
@@ -659,6 +1431,7 @@ Item {
                     color: Theme.launcherText
                     selectionColor: Theme.launcherSelection
                     selectedTextColor: Theme.launcherSelectedText
+                    maximumLength: root.searchMaximumLength
                     readOnly: root.virtualMachineShutdownMode
                     clip: true
                     cursorDelegate: Item {
@@ -749,6 +1522,8 @@ Item {
                                 property string readyPath: ""
 
                                 path: root.virtualMachineMode
+                                    || root.systemCommandMode
+                                    || root.calculatorMode
                                     ? ""
                                     : root.papirusApplicationIconPath(
                                         resultRow.modelData
@@ -762,8 +1537,14 @@ Item {
 
                             IconImage {
                                 visible: !root.virtualMachineMode
+                                    && !root.systemCommandMode
+                                    && !root.calculatorMode
                                 anchors.fill: parent
-                                source: papirusIconFile.readyPath !== ""
+                                source: root.virtualMachineMode
+                                    || root.systemCommandMode
+                                    || root.calculatorMode
+                                    ? ""
+                                    : papirusIconFile.readyPath !== ""
                                     ? "file://" + papirusIconFile.readyPath
                                     : root.applicationIcon(
                                         resultRow.modelData
@@ -771,8 +1552,23 @@ Item {
                                 mipmap: false
                             }
 
-                            // These are the same 32px state icons shipped by
-                            // virt-manager: shutoff, running, and paused.
+                            Text {
+                                visible: root.systemCommandMode
+                                    || root.calculatorMode
+                                anchors.fill: parent
+                                text: resultRow.modelData.glyph || ""
+                                color: Theme.launcherText
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                font {
+                                    family: "Font Awesome 7 Free"
+                                    styleName: "Solid"
+                                    pixelSize: 16
+                                }
+                            }
+
+                            // These are the same 32px GTK status icons resolved
+                            // by virt-manager: shutoff, running, and paused.
                             Image {
                                 visible: root.virtualMachineQueryMode
                                 anchors.centerIn: parent
@@ -800,10 +1596,26 @@ Item {
                             color: Theme.launcherText
                             font {
                                 family: "Iosevka"
-                                pixelSize: 15
+                                pixelSize: root.calculatorMode
+                                    ? Math.max(
+                                        10,
+                                        Math.min(
+                                            15,
+                                            width
+                                                / Math.max(
+                                                    1,
+                                                    text.length
+                                                )
+                                                * 1.9
+                                        )
+                                    )
+                                    : 15
                                 weight: Font.Medium
                             }
-                            elide: Text.ElideRight
+                            elide: root.calculatorMode
+                                ? Text.ElideNone
+                                : Text.ElideRight
+                            clip: root.calculatorMode
                             verticalAlignment: Text.AlignVCenter
                         }
 

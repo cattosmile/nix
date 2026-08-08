@@ -9,6 +9,15 @@
         suppress_event = "maximize";
       }
       {
+        match.title = "^(Click Assistant Overlay)$";
+        float = true;
+        no_anim = true;
+        no_initial_focus = true;
+        no_follow_mouse = true;
+        focus_on_activate = false;
+        no_blur = true;
+      }
+      {
         no_focus = true;
         match = {
           class = "^$";
@@ -30,11 +39,13 @@
         match.class = "^gamescope$";
         workspace = "1 silent";
         fullscreen = true;
+        immediate = true;
       }
       {
         match.class = "^\\.gamescope-wrapped$";
         workspace = "1 silent";
         fullscreen = true;
+        immediate = true;
       }
 
       # Roblox / Sober

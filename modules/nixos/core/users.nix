@@ -7,7 +7,6 @@
     isNormalUser = true;
     extraGroups = [
       "wheel"
-      "ydotool"
     ];
     hashedPasswordFile = config.sops.secrets.user_password.path;
   };
