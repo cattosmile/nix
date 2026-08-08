@@ -7,7 +7,7 @@
 }:
 
 let
-  cfg = config.programs.quickshellRice;
+  cfg = config.programs.quickshellLive;
   quickshell = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.default;
   runtimeInputs = [
     quickshell
@@ -21,7 +21,7 @@ let
   livePath = relativePath: lib.escapeShellArg "${cfg.root}/${relativePath}";
 
   start = pkgs.writeShellApplication {
-    name = "quickshell-rice";
+    name = "quickshell-live";
     inherit runtimeInputs;
     text = ''
       exec ${livePath "run.sh"} "$@"
@@ -29,7 +29,7 @@ let
   };
 
   reload = pkgs.writeShellApplication {
-    name = "quickshell-rice-reload";
+    name = "quickshell-reload";
     inherit runtimeInputs;
     text = ''
       exec ${livePath "reload-live.sh"} "$@"
@@ -37,7 +37,7 @@ let
   };
 
   ipc = pkgs.writeShellApplication {
-    name = "quickshell-rice-ipc";
+    name = "quickshell-ipc";
     inherit runtimeInputs;
     text = ''
       exec ${livePath "launcher-ipc.sh"} "$@"
@@ -46,16 +46,16 @@ let
 in
 
 {
-  options.programs.quickshellRice = {
-    enable = lib.mkEnableOption "the live Quickshell rice integration" // {
+  options.programs.quickshellLive = {
+    enable = lib.mkEnableOption "the live Quickshell integration" // {
       default = true;
     };
 
     root = lib.mkOption {
       type = lib.types.str;
-      default = "/home/user/Projects/Quickshell Rice";
+      default = "/home/user/Projects/Quickshell";
       description = ''
-        Working-tree path for the live Quickshell rice. The wrappers reference
+        Working-tree path for the live Quickshell configuration. The wrappers reference
         this path directly and never copy the QML into the Nix store.
       '';
     };
@@ -87,8 +87,8 @@ in
       ipc
     ];
 
-    programs.quickshellRice.start = start;
-    programs.quickshellRice.reload = reload;
-    programs.quickshellRice.ipc = ipc;
+    programs.quickshellLive.start = start;
+    programs.quickshellLive.reload = reload;
+    programs.quickshellLive.ipc = ipc;
   };
 }

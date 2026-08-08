@@ -10,7 +10,7 @@ let
   dbusUpdateActivationEnvironment = lib.getExe' pkgs.dbus "dbus-update-activation-environment";
   hyprctl = lib.getExe' config.wayland.windowManager.hyprland.package "hyprctl";
   quickshellStart = lib.escapeShellArgs [
-    (lib.getExe config.programs.quickshellRice.start)
+    (lib.getExe config.programs.quickshellLive.start)
     "--daemonize"
   ];
   clickAssistant = inputs.click-assistant.packages.${pkgs.stdenv.hostPlatform.system}.default;

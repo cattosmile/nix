@@ -13,13 +13,13 @@ let
   grim = lib.getExe pkgs.grim;
   nemo = lib.getExe pkgs.nemo-with-extensions;
   appLauncherToggle = lib.escapeShellArgs [
-    (lib.getExe config.programs.quickshellRice.ipc)
+    (lib.getExe config.programs.quickshellLive.ipc)
     "call"
     "launcher"
     "toggle"
   ];
   quickshellReload = lib.escapeShellArg (
-    lib.getExe config.programs.quickshellRice.reload
+    lib.getExe config.programs.quickshellLive.reload
   );
   clickAssistantIpc = lib.escapeShellArgs [
     (lib.getExe clickAssistant)
