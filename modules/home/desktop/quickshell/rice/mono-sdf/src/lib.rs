@@ -1,1 +1,0 @@
-mod qml_plugin;

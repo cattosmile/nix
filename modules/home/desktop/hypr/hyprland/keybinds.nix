@@ -6,26 +6,6 @@
   ...
 }:
 
-# let
-#   gameModeKill = pkgs.writeShellScriptBin "gamemode-kill" ''
-#     #!/usr/bin/env bash
-#
-#     HYPRCTL="${pkgs.hyprland}/bin/hyprctl"
-#     JQ="${pkgs.jq}/bin/jq"
-#
-#     ACTIVE=$($HYPRCTL activewindow -j)
-#     CLASS=$(echo "$ACTIVE" | $JQ -r ".class")
-#     PID=$(echo "$ACTIVE" | $JQ -r ".pid")
-#
-#     if [ "$CLASS" == "gamescope" ]; then
-#         kill -9 "$PID"
-#         pkill -f wineserver
-#     else
-#         $HYPRCTL dispatch killactive ""
-#     fi
-#   '';
-# in
-
 let
   alacritty = lib.getExe pkgs.alacritty;
   clickAssistant = inputs.click-assistant.packages.${pkgs.stdenv.hostPlatform.system}.default;
@@ -35,16 +15,6 @@ let
     (lib.getExe clickAssistant)
     "toggle"
   ];
-  liveRiceRoot = "/home/user/Projects/Quickshell Rice";
-  liveLauncherIpc = "${liveRiceRoot}/launcher-ipc.sh";
-  liveReload = "${liveRiceRoot}/reload-live.sh";
-  quickshellLauncherToggle = lib.escapeShellArgs [
-    liveLauncherIpc
-    "call"
-    "launcher"
-    "toggle"
-  ];
-  quickshellReload = lib.escapeShellArg liveReload;
   slurp = lib.getExe pkgs.slurp;
   swappy = lib.getExe pkgs.swappy;
   systemctl = lib.getExe' pkgs.systemd "systemctl";
@@ -94,20 +64,8 @@ in
       }
       {
         _args = [
-          "SUPER + SPACE"
-          (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${quickshellLauncherToggle}]])")
-        ];
-      }
-      {
-        _args = [
           "SUPER + SHIFT + A"
           (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${clickAssistantToggle}")'')
-        ];
-      }
-      {
-        _args = [
-          "SUPER + SHIFT + R"
-          (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${quickshellReload}]])")
         ];
       }
 
