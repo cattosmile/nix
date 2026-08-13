@@ -1,7 +1,6 @@
 {
   pkgs,
   unstable,
-  inputs,
   ...
 }:
 
@@ -18,7 +17,6 @@
     prismlauncher
     vlc
     unstable.rustdesk
-    inputs.switcha.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 }
 

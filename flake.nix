@@ -39,10 +39,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixslop.url = "github:cattosmile/NixSlop";
-    switcha = {
-      url = "path:/home/user/Projects/Switcha";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     click-assistant = {
       url = "path:/home/user/Projects/Assistant%20Thing";
       inputs.nixpkgs.follows = "nixpkgs";

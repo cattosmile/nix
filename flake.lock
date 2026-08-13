@@ -1051,8 +1051,7 @@
         "quickshell": "quickshell",
         "sls-steam": "sls-steam",
         "sops-nix": "sops-nix",
-        "spicetify-nix": "spicetify-nix",
-        "switcha": "switcha"
+        "spicetify-nix": "spicetify-nix"
       }
     },
     "sls-steam": {
@@ -1112,23 +1111,6 @@
         "owner": "Gerg-L",
         "repo": "spicetify-nix",
         "type": "github"
-      }
-    },
-    "switcha": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1786208572,
-        "narHash": "sha256-+jvWKa4SUH9NOmteKpvboLGwWgUokpoZ8teRStHt18A=",
-        "path": "/home/user/Projects/Switcha",
-        "type": "path"
-      },
-      "original": {
-        "path": "/home/user/Projects/Switcha",
-        "type": "path"
       }
     },
     "systems": {
