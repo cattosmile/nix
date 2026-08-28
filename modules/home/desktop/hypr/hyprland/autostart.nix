@@ -1,6 +1,5 @@
 {
   config,
-  inputs,
   lib,
   pkgs,
   ...
@@ -13,11 +12,6 @@ let
     (lib.getExe config.programs.quickshellLive.start)
     "--daemonize"
   ];
-  clickAssistant = inputs.click-assistant.packages.${pkgs.stdenv.hostPlatform.system}.default;
-  clickAssistantCommand = lib.escapeShellArgs [
-    (lib.getExe clickAssistant)
-    "--daemon"
-  ];
   systemctl = lib.getExe' pkgs.systemd "systemctl";
   cursorArgs = lib.escapeShellArgs [
     config.home.pointerCursor.name
@@ -26,19 +20,6 @@ let
 in
 
 {
-  systemd.user.services.click-assistant = {
-    Unit = {
-      Description = "Click Assistant Wayland overlay daemon";
-      After = [ "graphical-session.target" ];
-      PartOf = [ "graphical-session.target" ];
-    };
-    Service = {
-      ExecStart = clickAssistantCommand;
-      Restart = "on-failure";
-      RestartSec = 1;
-    };
-  };
-
   wayland.windowManager.hyprland.settings.on = [
     {
       _args = [

@@ -16,7 +16,7 @@
     unstable.helvum
     prismlauncher
     vlc
-    unstable.rustdesk
+    osu-lazer-bin
   ];
 }
 

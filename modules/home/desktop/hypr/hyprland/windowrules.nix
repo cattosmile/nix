@@ -9,16 +9,6 @@
         suppress_event = "maximize";
       }
       {
-        match.title = "^(Click Assistant Overlay)$";
-        float = true;
-        no_anim = true;
-        no_focus = true;
-        no_initial_focus = true;
-        no_follow_mouse = true;
-        focus_on_activate = false;
-        no_blur = true;
-      }
-      {
         no_focus = true;
         match = {
           class = "^$";

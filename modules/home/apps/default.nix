@@ -12,7 +12,11 @@
     ./spicetify
     ./flatpak
     ./codex
+    ./switcha
+    ./opencode
+    ./zcode
     ./ida-pro
     ./telegram
+    ./codebuddy
   ];
 }

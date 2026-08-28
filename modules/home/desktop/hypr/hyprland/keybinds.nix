@@ -1,7 +1,6 @@
 {
   config,
   hyprMonitors,
-  inputs,
   lib,
   pkgs,
   ...
@@ -9,7 +8,6 @@
 
 let
   alacritty = lib.getExe pkgs.alacritty;
-  clickAssistant = inputs.click-assistant.packages.${pkgs.stdenv.hostPlatform.system}.default;
   grim = lib.getExe pkgs.grim;
   nemo = lib.getExe pkgs.nemo-with-extensions;
   appLauncherToggle = lib.escapeShellArgs [
@@ -21,27 +19,8 @@ let
   quickshellReload = lib.escapeShellArg (
     lib.getExe config.programs.quickshellLive.reload
   );
-  clickAssistantIpc = lib.escapeShellArgs [
-    (lib.getExe clickAssistant)
-    "toggle"
-  ];
-  clickAssistantFloatingIpc = lib.escapeShellArgs [
-    (lib.getExe clickAssistant)
-    "toggle-floating"
-  ];
   slurp = lib.getExe pkgs.slurp;
   swappy = lib.getExe pkgs.swappy;
-  systemctl = lib.getExe' pkgs.systemd "systemctl";
-  clickAssistantToggle = pkgs.writeShellScript "click-assistant-toggle" ''
-    ${systemctl} --user start click-assistant.service
-    for attempt in $(seq 1 40); do
-      if ${clickAssistantIpc}; then
-        exit 0
-      fi
-      sleep 0.05
-    done
-    exit 1
-  '';
   wlCopy = lib.getExe' pkgs.wl-clipboard "wl-copy";
   wlPaste = lib.getExe' pkgs.wl-clipboard "wl-paste";
 in
@@ -88,13 +67,6 @@ in
           (lib.generators.mkLuaInline "hl.dsp.exec_cmd([[${quickshellReload}]])")
         ];
       }
-      {
-        _args = [
-          "SUPER + SHIFT + A"
-          (lib.generators.mkLuaInline ''hl.dsp.exec_cmd("${clickAssistantToggle}")'')
-        ];
-      }
-
       # Window Management
       {
         _args = [
@@ -111,7 +83,7 @@ in
       {
         _args = [
           "SUPER + V"
-          (lib.generators.mkLuaInline ''hl.dsp.exec_cmd([[${clickAssistantFloatingIpc}]])'')
+          (lib.generators.mkLuaInline ''hl.dsp.window.float({ action = "toggle" })'')
         ];
       }
       {
