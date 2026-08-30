@@ -17,6 +17,5 @@
     ./zcode
     ./ida-pro
     ./telegram
-    ./codebuddy
   ];
 }

@@ -195,6 +195,7 @@ in
 
   services.udev.extraRules = ''
     KERNEL=="kvmfr*", GROUP="kvm", MODE="0660", TAG+="uaccess"
+    SUBSYSTEM=="vfio", KERNEL=="[0-9]*", GROUP="kvm", MODE="0660", TAG+="uaccess"
   '';
 
   environment.systemPackages = with pkgs; [
