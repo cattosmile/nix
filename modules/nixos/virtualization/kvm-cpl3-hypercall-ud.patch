@@ -1,0 +1,19 @@
+--- a/arch/x86/kvm/x86.c	2026-08-30
++++ b/arch/x86/kvm/x86.c	2026-08-30
+@@ -10422,8 +10422,14 @@
+ 	}
+ 
+ 	if (cpl) {
+-		ret = -KVM_EPERM;
+-		goto out;
++		/*
++		 * QemuDetection: CPL3-Hypercalls stumm mit -KVM_EPERM zu
++		 * quittieren ist ein eindeutiges Hypervisor-Signal (VMAware
++		 * VM::KVM_INTERCEPTION: "keine Exception = abgefangen").
++		 * Echte Hardware liefert #UD - das hier ebenfalls injizieren.
++		 */
++		kvm_queue_exception_ud(vcpu);
++		return 1;
+ 	}
+ 
+ 	ret = -KVM_ENOSYS;
