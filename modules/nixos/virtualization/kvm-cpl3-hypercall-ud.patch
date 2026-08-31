@@ -12,7 +12,7 @@
 +		 * VM::KVM_INTERCEPTION: "keine Exception = abgefangen").
 +		 * Echte Hardware liefert #UD - das hier ebenfalls injizieren.
 +		 */
-+		kvm_queue_exception_ud(vcpu);
++		kvm_queue_exception(vcpu, UD_VECTOR);
 +		return 1;
  	}
  

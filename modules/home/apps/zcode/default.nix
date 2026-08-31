@@ -37,6 +37,8 @@ in
   home.packages = [ zcode-isolated ];
   xdg.mimeApps.defaultApplications."x-scheme-handler/zcode" = "zcode.desktop";
 
+  home.file.".zcode/skills/handoff/SKILL.md".source = ./skills/handoff/SKILL.md;
+
   home.file.".zcode/cli/config.json".text = builtins.toJSON {
     mcp.servers.ida = {
       type = "stdio";

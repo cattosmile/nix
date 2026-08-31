@@ -1,0 +1,403 @@
+--- a/arch/x86/kvm/vmx/vmx.c
++++ b/arch/x86/kvm/vmx/vmx.c
+@@ -6106,6 +6106,341 @@
+ }
+ 
+ /*
++ * QemuDetection: cache-clock exit masking.
++ *
++ * Cross-core cache-line clocks (one guest thread stores a counter to a
++ * shared cacheline, another guest thread on a different physical core
++ * polls it) advance at their burst rate whenever the polling vCPU is
++ * absent from guest mode, which makes every VM-exit observable as a
++ * latency spike far beyond bare-metal bounds.
++ *
++ * To keep such measurements within bare-metal bounds, a companion kernel
++ * thread ("qd_poller") polls the cachelines the exiting guest thread was
++ * spinning on while the vCPU thread is busy handling the exit, so the
++ * clock stays bounded by cross-core invalidation traffic, exactly as it
++ * is while the guest itself is polling. The masking is asymmetric by
++ * construction: the poller is only active while a vCPU is inside an
++ * exit, native guest execution is untouched.
++ *
++ * Candidate lines are derived from the pointer registers live at the
++ * CPUID exit (guest code hoists spin-loop pointers into callee-saved
++ * registers), translated guest-linear -> guest-physical -> host-virtual
++ * once and cached per vCPU. Lines that fault are dropped and
++ * retranslated automatically.
++ *
++ * The poller is enabled by pinning it to a host CPU that no vCPU uses:
++ *   echo 16 > /sys/module/kvm/parameters/qd_poller_cpu
++ * Writing -1 stops it again.
++ */
++#include <linux/kthread.h>
++#include <linux/sched/mm.h>
++#include <linux/timekeeping.h>
++#include <linux/uaccess.h>
++
++static int qd_poller_cpu = -1;
++static struct task_struct *qd_poller_task;
++static DEFINE_MUTEX(qd_poller_lock);
++
++#define QD_MAX_CAND 16
++
++struct qd_cand {
++	u64 gva;
++	unsigned long hva;
++};
++
++static struct qd_cand qd_cands[KVM_MAX_VCPUS][QD_MAX_CAND];
++static u8 qd_ncand[KVM_MAX_VCPUS];
++static u8 qd_inexit[KVM_MAX_VCPUS];
++static void *qd_kvm[KVM_MAX_VCPUS];
++
++gpa_t kvm_mmu_gva_to_gpa_read(struct kvm_vcpu *vcpu, gva_t gva,
++			      struct x86_exception *exception);
++
++static bool qd_translate(struct kvm_vcpu *vcpu, u64 gva, unsigned long *hva)
++{
++	struct x86_exception ex;
++	gpa_t gpa;
++
++	gpa = kvm_mmu_gva_to_gpa_read(vcpu, (gva_t)gva, &ex);
++	if (gpa == INVALID_GPA)
++		return false;
++	*hva = gfn_to_hva(vcpu->kvm, gpa >> PAGE_SHIFT);
++	if (kvm_is_error_hva(*hva))
++		return false;
++	*hva = (*hva & PAGE_MASK) | (gpa & ~PAGE_MASK);
++	*hva &= ~(unsigned long)0x3f;
++	return true;
++}
++
++/*
++ * QemuDetection: compilers fold the spin-loop pointer into RIP-relative
++ * accesses to the static counter, so no register holds its address at the
++ * CPUID exit. Scan the bytes right before the exiting CPUID for
++ * "REX.W 8B /r" with mod=00 rm=101 (mov r64, [rip+disp32]) and take the
++ * computed targets as additional poll candidates.
++ */
++static u64 qd_last_rip[KVM_MAX_VCPUS];
++
++static void qd_add_rip_cands(struct kvm_vcpu *vcpu)
++{
++	struct qd_cand *c = qd_cands[vcpu->vcpu_id];
++	u64 rip = vcpu->arch.regs[VCPU_REGS_RIP];
++	unsigned char code[64];
++	struct x86_exception ex;
++	int i, j;
++	u8 n;
++
++	/*
++	 * QemuDetection: der RIP-Scan macht einen Gast-Page-Walk (~1-3k
++	 * Zyklen) und verlaengert damit genau das Fenster, das wir klein
++	 * halten wollen. Nur scannen, wenn die Code-Region gewechselt hat
++	 * (Timer-Exits teilen sich EINE RIP).
++	 */
++	if (qd_last_rip[vcpu->vcpu_id] &&
++	    (rip >> 12) == (qd_last_rip[vcpu->vcpu_id] >> 12))
++		return;
++	qd_last_rip[vcpu->vcpu_id] = rip;
++
++	n = qd_ncand[vcpu->vcpu_id];
++
++	if (rip < sizeof code + 0x1000)
++		return;
++	if (kvm_read_guest_virt(vcpu, (gva_t)(rip - sizeof code), code,
++				sizeof code, &ex) != X86EMUL_CONTINUE)
++		return;
++
++	for (i = 0; i + 7 <= (int)sizeof code; i++) {
++		unsigned char *p = code + i;
++		s32 disp;
++		u64 gva;
++
++		if ((p[0] != 0x48 && p[0] != 0x4c) || p[1] != 0x8b ||
++		    (p[2] & 0xc7) != 0x05)
++			continue;
++
++		disp = *(s32 *)(p + 3);
++		gva = rip - sizeof code + (unsigned long)i + 7 + (s64)disp;
++		if (gva < 0x10000 || gva > 0x00007fffffffffffull)
++			continue;
++
++		for (j = 0; j < n; j++) {
++			if (c[j].gva == gva)
++				break;
++		}
++		if (j < n || n == QD_MAX_CAND)
++			continue;
++
++		{
++			unsigned long hva;
++			if (qd_translate(vcpu, gva, &hva)) {
++				c[n].gva = gva;
++				c[n].hva = hva;
++				n++;
++			}
++		}
++	}
++	qd_ncand[vcpu->vcpu_id] = n;
++}
++
++static void qd_update_cands(struct kvm_vcpu *vcpu)
++{
++	struct qd_cand *c = qd_cands[vcpu->vcpu_id];
++	int i, n = 0;
++
++	/*
++	 * QemuDetection: nur RIP-relative Kandidaten — die Register-Sweep
++	 * produzierte hauptsaechlich unbeteiligte Zeilen, die eine Poll-Runde
++	 * von ~20-80us verursachten (Messfenster ist nur ~2us). Verdichtung
++	 * + RIP-Scan.
++	 */
++	for (i = 0; i < QD_MAX_CAND; i++) {
++		if (!c[i].gva || !c[i].hva)
++			continue;
++		if (n != i) {
++			c[n] = c[i];
++			c[i].gva = 0;
++			c[i].hva = 0;
++		}
++		n++;
++	}
++	qd_ncand[vcpu->vcpu_id] = n;
++
++	qd_add_rip_cands(vcpu);
++}
++
++static int qd_poller_fn(void *unused)
++{
++	struct mm_struct *mm = NULL;
++	unsigned long v;
++	u64 last_active = 0;
++	int i, j;
++
++	while (!kthread_should_stop()) {
++		struct kvm *kvm = NULL;
++		u64 now = ktime_get_ns();
++		int any = 0;
++
++		/* QemuDetection: nur die ersten 64 vCPU-Flags scannen
++		 * (K_MAK_VCPUS=1024-Eintrags-Scan kostete ~1us pro Runde) */
++		for (i = 0; i < 64; i++) {
++			if (READ_ONCE(qd_inexit[i])) {
++				kvm = READ_ONCE(qd_kvm[i]);
++				any = 1;
++				break;
++			}
++		}
++
++		if (!any && (!last_active || now - last_active >= 10000000ULL)) {
++			/* kalt: langsam schlafen */
++			if (mm) {
++				kthread_unuse_mm(mm);
++				mm = NULL;
++			}
++			schedule_timeout_uninterruptible(msecs_to_jiffies(1));
++			continue;
++		}
++
++		if (any && kvm && kvm->mm) {
++			last_active = now;
++			if (mm != kvm->mm) {
++				if (mm)
++					kthread_unuse_mm(mm);
++				mm = kvm->mm;
++				kthread_use_mm(mm);
++			}
++		}
++
++		if (mm) {
++			/* heiss: alle Kandidaten mit rohen Loads pollen
++			 * (get_user-Overhead war zu langsam: Kadenz ~250 Zyklen) */
++			for (i = 0; i < 64; i++) {
++				u8 n = qd_ncand[i];
++				for (j = 0; j < n; j++) {
++					unsigned long hva = qd_cands[i][j].hva;
++					if (!hva)
++						continue;
++					user_access_begin((const void __user *)(uintptr_t)hva, sizeof(v));
++					unsafe_get_user(v, (unsigned long __user *)hva, qd_poll_fault);
++					user_access_end();
++					continue;
++qd_poll_fault:
++					user_access_end();
++					qd_cands[i][j].hva = 0;
++				}
++			}
++		}
++	}
++
++	if (mm)
++		kthread_unuse_mm(mm);
++	return 0;
++}
++
++static void qd_poller_teardown(void)
++{
++	struct task_struct *t;
++
++	mutex_lock(&qd_poller_lock);
++	t = READ_ONCE(qd_poller_task);
++	WRITE_ONCE(qd_poller_task, NULL);
++	mutex_unlock(&qd_poller_lock);
++
++	/*
++	 * Muss vor Modul-Entladung laufen: der Thread wohnt im Modulcode,
++	 * ohne kthread_stop laeuft er nach dem Entladen in freigegebenem
++	 * Speicher (Host-Freeze).
++	 */
++	if (t)
++		kthread_stop(t);
++}
++
++static int qd_poller_cpu_set(const char *val, const struct kernel_param *kp)
++{
++	struct task_struct *t;
++	int cpu, ret;
++
++	ret = kstrtoint(val, 0, &cpu);
++	if (ret)
++		return ret;
++
++	qd_poller_teardown();
++
++	if (cpu < 0) {
++		qd_poller_cpu = -1;
++		pr_info("QemuDetection: cache-clock poller gestoppt\n");
++		return 0;
++	}
++	if (cpu >= nr_cpu_ids || !cpu_online(cpu))
++		return -EINVAL;
++
++	t = kthread_create(qd_poller_fn, NULL, "qd_poller");
++	if (IS_ERR(t))
++		return PTR_ERR(t);
++
++	kthread_bind(t, cpu);
++	mutex_lock(&qd_poller_lock);
++	WRITE_ONCE(qd_poller_task, t);
++	mutex_unlock(&qd_poller_lock);
++	wake_up_process(t);
++
++	qd_poller_cpu = cpu;
++	pr_info("QemuDetection: cache-clock poller pinned to CPU %d\n", cpu);
++	return 0;
++}
++
++module_param_call(qd_poller_cpu, qd_poller_cpu_set, param_get_int,
++		  &qd_poller_cpu, 0644);
++MODULE_PARM_DESC(qd_poller_cpu,
++		 "QemuDetection: pin the cache-clock poller kthread to this CPU (-1 = off)");
++
++static int handle_cpuid(struct kvm_vcpu *vcpu)
++{
++	int r;
++
++	if (vcpu->vcpu_id < KVM_MAX_VCPUS && READ_ONCE(qd_poller_task) &&
++	    vmx_get_cpl(vcpu) == 3)
++		qd_update_cands(vcpu);
++
++	r = kvm_emulate_cpuid(vcpu);
++
++	/*
++	 * QemuDetection: deterministische Cache-Clock-Drosselung waehrend
++	 * der C-Phase dieses Exits — die eigene Kandidaten-Zeile(n) weitere
++	 * ~500 Zyklen pollen (stiehlt die Line alle ~100-200 Zyklen vom
++	 * Counter-Thread). Wir laufen im QEMU-Prozesskontext, get_user
++	 * greift hier direkt auf den Gast-Speicher zu.
++	 */
++	if (vcpu->vcpu_id < KVM_MAX_VCPUS) {
++		struct qd_cand *c = qd_cands[vcpu->vcpu_id];
++		u8 n = qd_ncand[vcpu->vcpu_id];
++
++		if (n) {
++			unsigned long v2;
++			int k, r;
++
++			for (r = 0; r < 10; r++) {
++				for (k = 0; k < n; k++) {
++					if (!c[k].hva)
++						continue;
++					user_access_begin((const void __user *)(uintptr_t)c[k].hva, sizeof(v2));
++					unsafe_get_user(v2, (unsigned long __user *)c[k].hva, qd_spin_fault);
++					user_access_end();
++					continue;
++qd_spin_fault:
++					user_access_end();
++					c[k].hva = 0;
++					goto qd_spin_done;
++				}
++			}
++qd_spin_done:
++			;
++		}
++	}
++
++	return r;
++}
++
++/*
+  * The exit handlers return 1 if the exit was handled fully and guest execution
+  * may resume.  Otherwise they set the kvm_run parameter to indicate what needs
+  * to be done to userspace and return 0.
+@@ -6118,7 +6453,7 @@
+ 	[EXIT_REASON_IO_INSTRUCTION]          = handle_io,
+ 	[EXIT_REASON_CR_ACCESS]               = handle_cr,
+ 	[EXIT_REASON_DR_ACCESS]               = handle_dr,
+-	[EXIT_REASON_CPUID]                   = kvm_emulate_cpuid,
++	[EXIT_REASON_CPUID]                   = handle_cpuid,
+ 	[EXIT_REASON_MSR_READ]                = kvm_emulate_rdmsr,
+ 	[EXIT_REASON_MSR_WRITE]               = kvm_emulate_wrmsr,
+ 	[EXIT_REASON_INTERRUPT_WINDOW]        = handle_interrupt_window,
+@@ -6648,7 +6983,16 @@
+ 
+ int vmx_handle_exit(struct kvm_vcpu *vcpu, fastpath_t exit_fastpath)
+ {
+-	int ret = __vmx_handle_exit(vcpu, exit_fastpath);
++	int ret;
++
++	if (vcpu->vcpu_id < KVM_MAX_VCPUS && READ_ONCE(qd_poller_task) &&
++	    vmx_get_exit_reason(vcpu).basic == EXIT_REASON_CPUID &&
++	    qd_ncand[vcpu->vcpu_id]) {
++		WRITE_ONCE(qd_kvm[vcpu->vcpu_id], vcpu->kvm);
++		WRITE_ONCE(qd_inexit[vcpu->vcpu_id], 1);
++	}
++
++	ret = __vmx_handle_exit(vcpu, exit_fastpath);
+ 
+ 	/*
+ 	 * Exit to user space when bus lock detected to inform that there is
+@@ -6659,8 +7003,12 @@
+ 			vcpu->run->exit_reason = KVM_EXIT_X86_BUS_LOCK;
+ 
+ 		vcpu->run->flags |= KVM_RUN_X86_BUS_LOCK;
++		if (vcpu->vcpu_id < KVM_MAX_VCPUS)
++			WRITE_ONCE(qd_inexit[vcpu->vcpu_id], 0);
+ 		return 0;
+ 	}
++	if (ret <= 0 && vcpu->vcpu_id < KVM_MAX_VCPUS)
++		WRITE_ONCE(qd_inexit[vcpu->vcpu_id], 0);
+ 	return ret;
+ }
+ 
+@@ -7462,6 +7810,9 @@
+ 
+ 	kvm_wait_lapic_expire(vcpu);
+ 
++	if (vcpu->vcpu_id < KVM_MAX_VCPUS && READ_ONCE(qd_inexit[vcpu->vcpu_id]))
++		WRITE_ONCE(qd_inexit[vcpu->vcpu_id], 0);
++
+ 	/* The actual VMENTER/EXIT is in the .noinstr.text section. */
+ 	vmx_vcpu_enter_exit(vcpu, __vmx_vcpu_run_flags(vmx));
+ 
+@@ -8688,6 +9039,8 @@
+ {
+ 	allow_smaller_maxphyaddr = false;
+ 
++	qd_poller_teardown();
++
+ 	vmx_cleanup_l1d_flush();
+ 
+ 	kvm_x86_vendor_exit();

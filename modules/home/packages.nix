@@ -17,6 +17,7 @@
     prismlauncher
     vlc
     osu-lazer-bin
+    amdgpu_top
   ];
 }
 

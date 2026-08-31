@@ -1,0 +1,39 @@
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -9239,9 +9239,12 @@
+ 	return dr6;
+ }
+ 
++static bool kvm_is_code_breakpoint_inhibited(struct kvm_vcpu *vcpu);
++
+ static int kvm_vcpu_do_singlestep(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_run *kvm_run = vcpu->run;
++	u32 dr6_bits = DR6_BS;
+ 
+ 	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+ 		kvm_run->debug.arch.dr6 = DR6_BS | DR6_ACTIVE_LOW;
+@@ -9250,7 +9253,22 @@
+ 		kvm_run->exit_reason = KVM_EXIT_DEBUG;
+ 		return 0;
+ 	}
+-	kvm_queue_exception_p(vcpu, DB_VECTOR, DR6_BS);
++
++	/*
++	 * QemuDetection: bare metal merges a pending #DB single-step trap
++	 * with execute-breakpoint faults on the instruction that is about
++	 * to execute into ONE #DB whose DR6 carries both BS and the Bn
++	 * bits. The emulated-instruction path delivered BS only, which
++	 * loses the breakpoint status (VMAware VM::TRAP). Merge the
++	 * guest-owned execute breakpoints for the new RIP like hardware.
++	 */
++	if ((vcpu->arch.dr7 & DR7_BP_EN_MASK) &&
++	    !kvm_is_code_breakpoint_inhibited(vcpu))
++		dr6_bits |= kvm_vcpu_check_hw_bp(kvm_get_linear_rip(vcpu), 0,
++						 vcpu->arch.dr7,
++						 vcpu->arch.db);
++
++	kvm_queue_exception_p(vcpu, DB_VECTOR, dr6_bits);
+ 	return 1;
+ }
+ 

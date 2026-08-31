@@ -1,0 +1,21 @@
+--- a/arch/x86/kvm/vmx/vmx.c
++++ b/arch/x86/kvm/vmx/vmx.c
+@@ -841,6 +841,18 @@
+ 	if (!vmx_need_pf_intercept(vcpu))
+ 		eb &= ~(1u << PF_VECTOR);
+ 
++	/*
++	 * QemuDetection: #DB nur intercepten, wenn Gast-Debugging aktiv ist.
++	 * Bare Metal liefert #DB nativ an den Gast-IDT; KVMs bedingungslose
++	 * #DB-VM-Exits erzeugen eine messbare Ausnahme-Latenz gegenueber
++	 * reinen Syscalls (VMAware VM::TIMER exception_ratio: #DB vs.
++	 * ZwRaiseException). Native Delivery ist bare-metal-identisch und
++	 * schliesst diesen Seitenkanal. Muss vor dem Nested-OR stehen,
++	 * damit L1-Intercept-Wuensche weiterhin respektiert werden.
++	 */
++	if (!(vcpu->guest_debug & KVM_GUESTDBG_ENABLE))
++		eb &= ~(1u << DB_VECTOR);
++
+ 	/* When we are running a nested L2 guest and L1 specified for it a
+ 	 * certain exception bitmap, we must trap the same exceptions and pass
+ 	 * them to L1. When running L2, we will only handle the exceptions
