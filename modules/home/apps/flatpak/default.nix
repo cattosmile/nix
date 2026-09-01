@@ -17,10 +17,6 @@
         appId = "com.google.Chrome";
         origin = "flathub";
       }
-      {
-        appId = "org.freedesktop.Platform.VulkanLayer.MangoHud";
-        origin = "flathub";
-      }
     ];
   };
 }

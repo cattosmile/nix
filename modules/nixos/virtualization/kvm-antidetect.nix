@@ -46,9 +46,24 @@
 # Aktivieren nach Reboot: echo 16 > /sys/module/kvm/parameters/qd_poller_cpu
 # Kanonische Quelle: QemuDetection/patches/kernel/0005-kvm-cpuid-cache-clock-mask.patch
 # Rebuild: sudo nixos-rebuild switch --flake /home/user/nix#desktop  + Reboot
+# 0006-0010 / QemuDetection / TIMER-Timing-Achse (2026-08-31/09-01):
+# 0006 CPUID-Exit-Fastpath, 0007 Re-Entry-Short-Circuit, 0008 TSC-Freeze
+# ueber CPUID-Exits (Payback-Design), 0009 RDTSC/RDTSCP-Interception mit
+# kompensiertem Return (rdtsc;cpuid;rdtsc 1513 -> 78 Zyklen = Metall),
+# 0010 Sturm-gesteuertes Geschwister-Halten gegen die Cache-Uhr.
+# ZUSAMMEN mit enable_apicv=0 (unten) — ohne APICv erreichen Kicks die
+# Geschwister-vCPUs ueberhaupt als VM-Exits. Host-Kosten: haehere
+# Interrupt-Latenz durch fehlendes APICv (~5-10% Interrupt-lastig).
+# Kanonische Quellen: QemuDetection/patches/kernel/000{6,7,8,9}-*.patch,
+# 0010-kvm-storm-sibling-freeze.patch (in Reihenfolge anwenden!)
+# Rebuild: sudo nixos-rebuild switch --flake /home/user/nix#desktop + Reboot
 { config, lib, ... }:
 
 {
+  boot.extraModprobeConfig = ''
+    options kvm_intel enable_apicv=0
+  '';
+
   boot.kernelPatches = [
     {
       name = "kvm-cpl3-hypercall-ud";
@@ -65,6 +80,13 @@
     {
       name = "kvm-cpuid-cache-clock-mask";
       patch = ./kvm-cpuid-cache-clock-mask.patch;
+    }
+    {
+      # Konsolidierter TIMER-Stack (0006 Fastpath + 0007 Short-Circuit +
+      # 0008 TSC-Freeze + 0009 RDTSC-Interception + 0010 Sibling-Freeze,
+      # exakt der auf dem Produktionssystem getestete Modulstand).
+      name = "kvm-qd-timer-stack";
+      patch = ./kvm-qd-timer-stack.patch;
     }
   ];
 }

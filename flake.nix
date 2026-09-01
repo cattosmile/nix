@@ -14,7 +14,6 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Pin Hyprland to the 0.56.0 release. Update this tag deliberately.
     hyprland.url = "github:hyprwm/Hyprland/v0.56.0";
     hyprpaper = {
       url = "github:hyprwm/hyprpaper";
@@ -39,6 +38,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixslop.url = "github:cattosmile/NixSlop";
+    NixLocalQwen = {
+      url = "git+http://192.168.1.117:3000/cattosmile/NixLocalQwen.git";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     switcha = {
       url = "path:/home/user/Projects/Switcha";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -52,7 +55,6 @@
       url = "git+http://192.168.1.117:3000/cattosmile/ida-pro-nix.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    inputs.localai.url = "git+file:///home/user/Projects/LocalAI";
   };
 
   outputs =

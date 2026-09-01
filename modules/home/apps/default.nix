@@ -17,5 +17,6 @@
     ./zcode
     ./ida-pro
     ./telegram
+    ./localqwen
   ];
 }

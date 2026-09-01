@@ -1,0 +1,521 @@
+--- a/arch/x86/kvm/vmx/vmx.h	2026-09-01 16:29:54.059205132 +0200
++++ b/arch/x86/kvm/vmx/vmx.h	2026-09-01 13:55:32.318525042 +0200
+@@ -214,6 +214,20 @@
+ 	u8                    fail;
+ 	u8		      x2apic_msr_bitmap_mode;
+ 
++	/* QemuDetection: CPUID-Exit-Timing-Instrumentierung (nur Debug-Builds) */
++	u64		      qd_ts0, qd_ts1, qd_ts2, qd_ts3;
++	u64		      qd_n, qd_nloop;
++	u64		      qd_acc_disp, qd_acc_hdl, qd_acc_loop;
++	u64		      qd_min_disp, qd_min_hdl, qd_min_loop;
++
++	/* QemuDetection 0009: RDTSC-Exit-Kompensation */
++	u64		      qd_tsc_val;
++	u64		      qd_tsc_last; /* v2: Monotonie-Anker */
++	u8                    qd_tsc_rdtscp, qd_tsc_valid;
++
++	/* QemuDetection 0010: Sturm-Detektion (CPL3-CPUID-Rate) */
++	u64		      qd_win_tsc, qd_win_n;
++
+ 	u32                   idt_vectoring_info;
+ 	ulong                 rflags;
+ 
+--- a/arch/x86/kvm/vmx/vmx.c	2026-09-01 16:29:54.072314449 +0200
++++ b/arch/x86/kvm/vmx/vmx.c	2026-09-01 15:43:03.546770977 +0200
+@@ -841,18 +841,6 @@
+ 	if (!vmx_need_pf_intercept(vcpu))
+ 		eb &= ~(1u << PF_VECTOR);
+ 
+-	/*
+-	 * QemuDetection: #DB nur intercepten, wenn Gast-Debugging aktiv ist.
+-	 * Bare Metal liefert #DB nativ an den Gast-IDT; KVMs bedingungslose
+-	 * #DB-VM-Exits erzeugen eine messbare Ausnahme-Latenz gegenueber
+-	 * reinen Syscalls (VMAware VM::TIMER exception_ratio: #DB vs.
+-	 * ZwRaiseException). Native Delivery ist bare-metal-identisch und
+-	 * schliesst diesen Seitenkanal. Muss vor dem Nested-OR stehen,
+-	 * damit L1-Intercept-Wuensche weiterhin respektiert werden.
+-	 */
+-	if (!(vcpu->guest_debug & KVM_GUESTDBG_ENABLE))
+-		eb &= ~(1u << DB_VECTOR);
+-
+ 	/* When we are running a nested L2 guest and L1 specified for it a
+ 	 * certain exception bitmap, we must trap the same exceptions and pass
+ 	 * them to L1. When running L2, we will only handle the exceptions
+@@ -4461,6 +4449,69 @@
+ 	vmx_update_msr_bitmap_x2apic(vcpu);
+ }
+ 
++/* QD-RDTSC (0009): RDTSC/RDTSCP-Exits mit kompensiertem TSC-Return.
++ * Jede Gast-TSC-Lektuere (rdtsc/rdtscp) wird zum Exit; der Rueckgabewert
++ * wird am fruehesten Capture-Punkt um den Entry-Microcode gefaltet und
++ * der Handler-/Resume-Anteil ueber den 0008-Schuldtopf versteckt —
++ * Differenzen wie rdtsc;cpuid;rdtsc zeigen dann nur echte Gast-Zyklen
++ * (Metall-Latenz) statt der ~1300-2300 Zyklen VM-Exit-Realitaet. */
++static int qd_rdtsc_exit = 1;
++static int qd_entry_fold = 750;
++static unsigned long long qd_tsc_debt_cap = 150000000ULL;
++static atomic64_t qd_nrdtsc = ATOMIC64_INIT(0);
++static atomic64_t qd_npublish, qd_narm, qd_nhold;
++module_param(qd_rdtsc_exit, int, 0644);
++MODULE_PARM_DESC(qd_rdtsc_exit,
++		 "QemuDetection: RDTSC/RDTSCP-Exits kompensieren (1=an, 0=aus)");
++module_param(qd_entry_fold, int, 0644);
++MODULE_PARM_DESC(qd_entry_fold,
++		 "QemuDetection: geschaetzter Exit-Entry-Microcode in Zyklen (Kalibrierung)");
++module_param(qd_tsc_debt_cap, ullong, 0644);
++MODULE_PARM_DESC(qd_tsc_debt_cap,
++		 "QemuDetection: max. TSC-Wanduhr-Schuld in Zyklen pro vCPU");
++
++static int qd_rdtsc_count_get(char *buf, const struct kernel_param *kp)
++{
++	return scnprintf(buf, PAGE_SIZE,
++			 "rdtsc=%lld publish=%lld arm=%lld hold=%lld\n",
++			 atomic64_read(&qd_nrdtsc),
++			 atomic64_read(&qd_npublish),
++			 atomic64_read(&qd_narm),
++			 atomic64_read(&qd_nhold));
++}
++
++static const struct kernel_param_ops qd_rdtsc_count_ops = {
++	.get = qd_rdtsc_count_get,
++};
++module_param_cb(qd_rdtsc_count, &qd_rdtsc_count_ops, NULL, 0444);
++
++/* QD-STORM (0010): VMAware-TIMER misst die CPUID-Wall-Time mit einer
++ * Cache-Uhr auf einem Geschwister-vCPU — TSC-Kompensation (0009) ist
++ * darauf wirkungslos. Gegenmittel: sobald die CPL3-CPUID-Rate eines
++ * vCPUs Probe-Sturm-Niveau erreicht, haelt jedes Geschwister-vCPU seine
++ * VMENTERs fuer die publizierte Haltefrist an. Die Cache-Uhr friert
++ * waehrend der Exit-Verarbeitung ein und zaehlt nur noch native
++ * Gast-Segmente; das Quantisierungsverhaeltnis kollabiert auf Metall. */
++static int qd_storm = 1;
++static int qd_storm_thresh = 5000;   /* CPL3-CPUIDs pro Fenster */
++static int qd_storm_hold_us = 3;     /* Haltefrist je Exit, Mikrosekunden */
++static int qd_storm_win_ms = 200;    /* Detektionsfenster */
++static u64 qd_storm_until;           /* jiffies: Sturm bewaffnet bis */
++static atomic64_t qd_freeze_until;   /* absolutes Host-TSC: Haltefrist */
++static atomic_t qd_freeze_cpu = ATOMIC_INIT(-1); /* Publisher-Host-CPU */
++module_param(qd_storm, int, 0644);
++MODULE_PARM_DESC(qd_storm,
++		 "QemuDetection: Sturm-gesteuertes Geschwister-Halten (1=an)");
++module_param(qd_storm_thresh, int, 0644);
++MODULE_PARM_DESC(qd_storm_thresh,
++		 "QemuDetection: CPL3-CPUIDs pro Fenster fuer Sturmermittlung");
++module_param(qd_storm_hold_us, int, 0644);
++MODULE_PARM_DESC(qd_storm_hold_us,
++		 "QemuDetection: Haltefrist der Geschwister je Probe-Exit (us)");
++module_param(qd_storm_win_ms, int, 0644);
++MODULE_PARM_DESC(qd_storm_win_ms,
++		 "QemuDetection: Detektionsfenster in Millisekunden");
++
+ static u32 vmx_exec_control(struct vcpu_vmx *vmx)
+ {
+ 	u32 exec_control = vmcs_config.cpu_based_exec_ctrl;
+@@ -4474,6 +4525,11 @@
+ 			  CPU_BASED_MONITOR_TRAP_FLAG |
+ 			  CPU_BASED_PAUSE_EXITING);
+ 
++	/* QD-RDTSC (0009): RDTSC/RDTSCP Exiting aktivieren — die TSC-Lektueren
++	 * selbst fangen und kompensiert zurueckgeben (siehe vmx_vcpu_run). */
++	if (qd_rdtsc_exit)
++		exec_control |= CPU_BASED_RDTSC_EXITING;
++
+ 	/* INTR_WINDOW_EXITING and NMI_WINDOW_EXITING are toggled dynamically */
+ 	exec_control &= ~(CPU_BASED_INTR_WINDOW_EXITING |
+ 			  CPU_BASED_NMI_WINDOW_EXITING);
+@@ -6148,6 +6204,7 @@
+ #include <linux/sched/mm.h>
+ #include <linux/timekeeping.h>
+ #include <linux/uaccess.h>
++#include <asm/tsc.h>
+ 
+ static int qd_poller_cpu = -1;
+ static struct task_struct *qd_poller_task;
+@@ -6410,8 +6467,16 @@
+ 	int r;
+ 
+ 	if (vcpu->vcpu_id < KVM_MAX_VCPUS && READ_ONCE(qd_poller_task) &&
+-	    vmx_get_cpl(vcpu) == 3)
++	    vmx_get_cpl(vcpu) == 3) {
+ 		qd_update_cands(vcpu);
++		if (qd_ncand[vcpu->vcpu_id])
++			pr_info_ratelimited("QD-CAND vcpu%u rip=%llx gva0=%llx hva0=%lx n=%u\n",
++					    vcpu->vcpu_id,
++					    (unsigned long long)vcpu->arch.regs[VCPU_REGS_RIP],
++					    (unsigned long long)qd_cands[vcpu->vcpu_id][0].gva,
++					    (unsigned long)qd_cands[vcpu->vcpu_id][0].hva,
++					    qd_ncand[vcpu->vcpu_id]);
++	}
+ 
+ 	r = kvm_emulate_cpuid(vcpu);
+ 
+@@ -6457,6 +6522,52 @@
+  * may resume.  Otherwise they set the kvm_run parameter to indicate what needs
+  * to be done to userspace and return 0.
+  */
++/*
++ * QD-RDTSC (0009): RDTSC/RDTSCP-Exit mit kompensiertem Rueckgabewert.
++ * Wert/Flag wurden im vmx_vcpu_run am fruehesten Capture-Punkt gestasht
++ * (Entry-Falte schon im Offset); hier nur Register befuellen und RIP um
++ * die feste Instruktionslaenge (rdtsc=2, rdtscp=3 Bytes) erhoehen.
++ * Wird nur erreicht, wenn der Short-Circuit in vmx_vcpu_run aussteigt
++ * (TF/Singlestep) — Nested-Exits werden vorher nach L1 reflektiert.
++ */
++static int handle_qd_rdtsc(struct kvm_vcpu *vcpu)
++{
++	struct vcpu_vmx *vmx = to_vmx(vcpu);
++	bool qd_rp = vmx_get_exit_reason(vcpu).basic == EXIT_REASON_RDTSCP;
++	u64 qd_g = vmx->qd_tsc_valid ? vmx->qd_tsc_val
++				     : kvm_read_l1_tsc(vcpu, rdtsc());
++
++	kvm_register_write(vcpu, VCPU_REGS_RAX, (u32)qd_g);
++	kvm_register_write(vcpu, VCPU_REGS_RDX, qd_g >> 32);
++	if (qd_rp) {
++		u32 qd_aux;
++
++		rdmsrl(MSR_TSC_AUX, qd_aux);
++		kvm_register_write(vcpu, VCPU_REGS_RCX, qd_aux);
++	}
++	vmx_set_interrupt_shadow(vcpu, 0);
++	kvm_rip_write(vcpu, kvm_rip_read(vcpu) + (qd_rp ? 3 : 2));
++	vmx->qd_tsc_valid = 0;
++
++	return 1;
++}
++
++/*
++ * QD-RDTSC v3: UMWAIT/TPAUSE verursachen mit aktivem RDTSC-Exiting
++ * ebenfalls VM-Exits (beide TSC-abhaengig, SDM) — Mainline hat dafuer
++ * keinen Handler, weil ohne RDTSC-Exiting nie einer auftritt.
++ * Emulation: sofortiges Zurueckkehren (Spin- statt Warte-Semantik,
++ * TSC-Deadline-Aspekt entfaellt mit unserer kompensierten Uhr harmlos),
++ * RIPAdvance ueber die VMCS-Instruktionslaenge (fuer instruk-
++ * tionsverursachte Exits architektonisch bereitgestellt).
++ */
++static int handle_qd_waitpkg(struct kvm_vcpu *vcpu)
++{
++	kvm_rip_write(vcpu, kvm_rip_read(vcpu) +
++		      vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
++	return 1;
++}
++
+ static int (*kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
+ 	[EXIT_REASON_EXCEPTION_NMI]           = handle_exception_nmi,
+ 	[EXIT_REASON_EXTERNAL_INTERRUPT]      = handle_external_interrupt,
+@@ -6468,6 +6579,10 @@
+ 	[EXIT_REASON_CPUID]                   = handle_cpuid,
+ 	[EXIT_REASON_MSR_READ]                = kvm_emulate_rdmsr,
+ 	[EXIT_REASON_MSR_WRITE]               = kvm_emulate_wrmsr,
++	[EXIT_REASON_RDTSC]                   = handle_qd_rdtsc,
++	[EXIT_REASON_RDTSCP]                  = handle_qd_rdtsc,
++	[EXIT_REASON_UMWAIT]                  = handle_qd_waitpkg,
++	[EXIT_REASON_TPAUSE]                  = handle_qd_waitpkg,
+ 	[EXIT_REASON_INTERRUPT_WINDOW]        = handle_interrupt_window,
+ 	[EXIT_REASON_HLT]                     = kvm_emulate_halt,
+ 	[EXIT_REASON_INVD]		      = kvm_emulate_invd,
+@@ -7655,6 +7770,30 @@
+ 		return handle_fastpath_hlt(vcpu);
+ 	case EXIT_REASON_INVD:
+ 		return handle_fastpath_invd(vcpu);
++	case EXIT_REASON_CPUID: {
++		/*
++		 * QemuDetection: CPUID im Exit-Fastpath — kvm_emulate_cpuid()
++		 * direkt abarbeiten und mit REENTER_GUEST zum VMENTER zurueck-
++		 * springen, ohne den kompletten Post-Exit-Block (IRQ-Roundtrip,
++		 * Timing-Accounting, Preempt/SRCU, handle_exit-Dispatch) zu
++		 * durchlaufen. Gates gegen alle Rueckgabe-0-Pfade von
++		 * kvm_skip_emulated_instruction(): kein Gast-Singlestep, kein
++		 * TF im Gast-RFLAGS, kein CPUID-Faulting; Nested ist oben
++		 * bereits ausgeschlossen.
++		 */
++		if (!(vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) &&
++		    !(vmx_get_rflags(vcpu) & X86_EFLAGS_TF) &&
++		    !(vcpu->arch.msr_misc_features_enables &
++		      MSR_MISC_FEATURES_ENABLES_CPUID_FAULT)) {
++			int r = kvm_emulate_cpuid(vcpu);
++
++			if (r == 1)
++				return EXIT_FASTPATH_REENTER_GUEST;
++
++			pr_warn_ratelimited("kvm: CPUID fastpath unexpected r=%d\n", r);
++		}
++		return EXIT_FASTPATH_NONE;
++	}
+ 	default:
+ 		return EXIT_FASTPATH_NONE;
+ 	}
+@@ -7727,12 +7866,50 @@
+ 	guest_state_exit_irqoff();
+ }
+ 
++/* QD-DEEP: max. aufeinanderfolgende CPUID-Short-Circuits pro vcpu_run */
++#define QD_SC_MAX 65536
++
++/* QD-TSC: Gast-TSC ueber CPUID-Exits einfrieren — RDTSC-Paar-Delta-Klasse
++ * (EAC/Vanguard-typische Timing-Checks) sieht dann Metall-Latenz statt
++ * ~2000 Zyklen Exit. Gesamtdiebstahl auf QD_TSC_DEBT_CAP begrenzt, damit
++ * kein gegen Wanduhr detektierbarer TSC-Drift entsteht. VMAware TIMER
++ * (Cache-Uhr, kein TSC) ist davon unberuehrt — das ist bekannt und OK. */
++static int qd_tsc_freeze = 1;
++module_param(qd_tsc_freeze, int, 0644);
++MODULE_PARM_DESC(qd_tsc_freeze,
++		 "QemuDetection: Gast-TSC ueber CPUID-Exits einfrieren (1=an, 0=aus)");
++/* Wanduhr-Schuld-Cap je vCPU (umdrehbar via Modulparam qd_tsc_debt_cap) */
++
+ fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu, u64 run_flags)
+ {
+ 	bool force_immediate_exit = run_flags & KVM_RUN_FORCE_IMMEDIATE_EXIT;
+ 	struct vcpu_vmx *vmx = to_vmx(vcpu);
+ 	unsigned long cr3, cr4;
+ 
++	/* QD-TSC: Stempel gilt nur innerhalb einer vmx_vcpu_run-Invocation */
++	vmx->qd_ts0 = 0;
++
++	/*
++	 * QD-STORM (0010): bewaffnete Geschwister halten bis zur Freeze-
++	 * Deadline (absolute TSC, immer endlich — kein Deadlock, keine
++	 * Locks). Der Publisher selbst ist per Host-CPU ausgeschlossen.
++	 */
++	if (qd_storm) {
++		u64 qd_fu = atomic64_read(&qd_freeze_until);
++
++		if (qd_fu && raw_smp_processor_id() != atomic_read(&qd_freeze_cpu)) {
++			u64 qd_now = rdtsc();
++
++			if ((s64)(qd_fu - qd_now) > 0) {
++				atomic64_inc(&qd_nhold);
++				while ((s64)(qd_fu - qd_now) > 0) {
++					cpu_relax();
++					qd_now = rdtsc();
++				}
++			}
++		}
++	}
++
+ 	/* Record the guest's net vcpu time for enforced NMI injections. */
+ 	if (unlikely(!enable_vnmi &&
+ 		     vmx->loaded_vmcs->soft_vnmi_blocked))
+@@ -7768,6 +7945,7 @@
+ 	 */
+ 	WARN_ON_ONCE(vmx->nested.need_vmcs12_to_shadow_sync);
+ 
++qd_reenter:
+ 	if (kvm_register_is_dirty(vcpu, VCPU_REGS_RSP))
+ 		vmcs_writel(GUEST_RSP, vcpu->arch.regs[VCPU_REGS_RSP]);
+ 	if (kvm_register_is_dirty(vcpu, VCPU_REGS_RIP))
+@@ -7825,9 +8003,124 @@
+ 	if (vcpu->vcpu_id < KVM_MAX_VCPUS && READ_ONCE(qd_inexit[vcpu->vcpu_id]))
+ 		WRITE_ONCE(qd_inexit[vcpu->vcpu_id], 0);
+ 
++	/*
++	 * QD-TSC: spaetester moeglicher Freeze-Punkt, direkt vor dem
++	 * VMENTER — deckt den kompletten Exit-Handling-Bereich ab.
++	 * Stempel gilt nur innerhalb dieser Invocation (Eintritt-Clear
++	 * oben), Per-Event-Grenze ~33µs gegen Scheduling-Rauschen,
++	 * Gesamt-Cap gegen TSC-vs-Wanduhr-Drift. Nicht versteckbar
++	 * bleiben allein die VMX-Transitionen selbst (Microcode).
++	 */
++	if (unlikely(vmx->qd_ts0)) {
++		u64 qd_stolen = rdtsc() - vmx->qd_ts0;
++
++		vmx->qd_ts0 = 0;
++		if (!vcpu->arch.guest_tsc_protected &&
++		    qd_stolen < 100000ULL &&
++		    vmx->qd_ts1 + qd_stolen < qd_tsc_debt_cap) {
++			vmx->qd_ts1 += qd_stolen;
++			vcpu->arch.l1_tsc_offset -= (s64)qd_stolen;
++			vcpu->arch.tsc_offset = vcpu->arch.l1_tsc_offset;
++			vmx_write_tsc_offset(vcpu);
++		}
++	}
++
+ 	/* The actual VMENTER/EXIT is in the .noinstr.text section. */
+ 	vmx_vcpu_enter_exit(vcpu, __vmx_vcpu_run_flags(vmx));
+ 
++	/* QD-TSC: Stempel setzen, wenn dieser Exit ein CPUID-Exit war
++	 * (nur CPL3 — Kernel-CPUIDs frieren nicht, reduziert Grundrauschen) */
++	if (qd_tsc_freeze && !vmx->fail && !is_guest_mode(vcpu) &&
++	    vmx_get_cpl(vcpu) == 3 &&
++	   vmx_get_exit_reason(vcpu).basic == EXIT_REASON_CPUID)
++		vmx->qd_ts0 = rdtsc();
++
++	/*
++	 * QD-RDTSC (0009): Entry-Microcode des Exits (Instruktionsgrenze ->
++	 * Capture-Punkt) per konstanter Falte aus dem Gast-TSC nehmen.
++	 * Zusammen mit dem 0008-Tail-Payback (Stempel -> VMENTER) liegen
++	 * beide Exit-Kostenanteile je Exit als Konstanten vor und heben
++	 * sich in Differenzen aufeinanderfolgender Rueckgabewerte auf:
++	 * rdtsc;cpuid;rdtsc misst nur noch echte Gast-Zyklen. Die Falte
++	 * ist Wanduhr-Schuld und laeuft ueber den 0008-Schuldtopf.
++	 */
++	if (qd_rdtsc_exit && !vmx->fail && !is_guest_mode(vcpu) &&
++	    !vcpu->arch.guest_tsc_protected) {
++		u32 qd_b = vmx_get_exit_reason(vcpu).basic;
++
++		if (qd_b == EXIT_REASON_CPUID || qd_b == EXIT_REASON_RDTSC ||
++		    qd_b == EXIT_REASON_RDTSCP) {
++			if (qd_b == EXIT_REASON_CPUID && vmx_get_cpl(vcpu) == 3) {
++				/*
++				 * QD-STORM (0010): Rate messen, bewaffnen, und im
++				 * bewaffneten Zustand die Haltefrist publizieren +
++				 * alle Geschwister anstossen (Posted Interrupt ->
++				 * deren naechster VMENTER laeuft ueber den Hold).
++				 */
++				u64 qd_now = rdtsc();
++				u64 qd_win = (u64)vcpu->arch.virtual_tsc_khz *
++					     (u64)qd_storm_win_ms * 1000;
++
++				if (!qd_win)
++					qd_win = 720000000ULL;
++				if (!vmx->qd_win_tsc ||
++				    (u64)(qd_now - vmx->qd_win_tsc) > qd_win) {
++					if (vmx->qd_win_n >= (u64)qd_storm_thresh) {
++						/* HZ/2: kurze Fenster liessen die Armierung
++						 * zwischen den Messsegmenten verfallen */
++						WRITE_ONCE(qd_storm_until, jiffies + HZ / 2);
++						atomic64_inc(&qd_narm);
++					}
++					vmx->qd_win_tsc = qd_now;
++					vmx->qd_win_n = 0;
++				}
++				vmx->qd_win_n++;
++
++				if (!time_after(jiffies, READ_ONCE(qd_storm_until))) {
++					u64 qd_hold = (u64)vcpu->arch.virtual_tsc_khz *
++						      (u64)qd_storm_hold_us / 1000;
++					unsigned long qd_i;
++					struct kvm_vcpu *qd_v;
++
++					if (!qd_hold)
++						qd_hold = 10000;
++					atomic64_inc(&qd_npublish);
++					atomic64_set(&qd_freeze_until, rdtsc() + qd_hold);
++					atomic_set(&qd_freeze_cpu, vcpu->cpu);
++					kvm_for_each_vcpu(qd_i, qd_v, vcpu->kvm) {
++						if (qd_v != vcpu)
++							kvm_vcpu_kick(qd_v);
++					}
++				}
++			}
++			if (vmx->qd_ts1 + qd_entry_fold < qd_tsc_debt_cap) {
++				vcpu->arch.l1_tsc_offset -= (s64)qd_entry_fold;
++				vcpu->arch.tsc_offset = vcpu->arch.l1_tsc_offset;
++				vmx_write_tsc_offset(vcpu);
++				vmx->qd_ts1 += qd_entry_fold;
++			}
++
++			if (qd_b != EXIT_REASON_CPUID) {
++				u64 qd_g = kvm_read_l1_tsc(vcpu, rdtsc());
++
++				/*
++				 * QD-RDTSC v2: Monotonie-Garantie — die kalibrierte
++				 * Falte darf den Gast-TSC NIE rueckwaerts laufen
++				 * lassen (v1 ließ enge rdtsc-Paare negativ werden ->
++				 * OVMF/Windows-Delay-Loops hingen im fruehen Boot).
++				 */
++				if (qd_g <= vmx->qd_tsc_last)
++					qd_g = vmx->qd_tsc_last + 1;
++				vmx->qd_tsc_last = qd_g;
++				vmx->qd_tsc_val = qd_g;
++				vmx->qd_tsc_rdtscp = (qd_b == EXIT_REASON_RDTSCP);
++				vmx->qd_tsc_valid = 1;
++				vmx->qd_ts0 = rdtsc(); /* Tail: 0008-Payback */
++				atomic64_inc(&qd_nrdtsc);
++			}
++		}
++	}
++
+ 	/* All fields are clean at this point */
+ 	if (kvm_is_using_evmcs()) {
+ 		current_evmcs->hv_clean_fields |=
+@@ -7885,6 +8178,89 @@
+ 	vmx_recover_nmi_blocking(vmx);
+ 	vmx_complete_interrupts(vmx);
+ 
++	/*
++	 * QD-TSC: Schuld graduell zurueckzahlen (nur auf Nicht-CPUID-Exits,
++	 * CPUID-Exits verzweigen unten vorher in den Short-Circuit). Ohne
++	 * Payback bleibt der Diebstahl bis zum Cap stehen (bis ~50 ms pro
++	 * vCPU) und bringt Windows-User-Services via TSC-Inkonsistenz zum
++	 * Absturz (Clipboard/CDP/PushNotifications, Eventlog 7031/7009).
++	 * Mit Payback begrenzt sich der stehende Drift auf Mikrosekunden
++	 * und heilt nach einer Probe in Sekunden ab.
++	 */
++	if (vmx->qd_ts1 &&
++	    vmx_get_exit_reason(vcpu).basic != EXIT_REASON_CPUID &&
++	    vmx_get_exit_reason(vcpu).basic != EXIT_REASON_RDTSC &&
++	    vmx_get_exit_reason(vcpu).basic != EXIT_REASON_RDTSCP) {
++		u64 qd_pay = min_t(u64, vmx->qd_ts1, 1000);
++
++		vmx->qd_ts1 -= qd_pay;
++		vcpu->arch.l1_tsc_offset += (s64)qd_pay;
++		vcpu->arch.tsc_offset = vcpu->arch.l1_tsc_offset;
++		vmx_write_tsc_offset(vcpu);
++	}
++
++	/*
++	 * QD-DEEP: CPUID-Short-Circuit — den Exit komplett hier abarbeiten
++	 * und per goto direkt zum VMENTER zurueckspringen: keine C-Rueckkehr
++	 * nach vcpu_enter_guest, kein Loop-Top (Requests/Injection/sync_pir),
++	 * kein erneuter vmx_vcpu_run-Prolog (trace/ple/nested-Warn).
++	 * Wiederholt werden nur die essenziellen Pre-VMENTER-Schritte ab
++	 * qd_reenter (RIP/RSP-Flush, xsave, hv_timer, lapic-align).
++	 * Gates identisch zum 0006-Fastpath; QD_SC_MAX begrenzt aufeinander-
++	 * folgende Short-Circuits (Event-Deferral), danach ein normaler
++	 * REENTER-Durchlauf durch den Loop-Top.
++	 */
++	if (!is_guest_mode(vcpu) &&
++	    vmx_get_exit_reason(vcpu).basic == EXIT_REASON_CPUID &&
++	    !(vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) &&
++	    !(vmx_get_rflags(vcpu) & X86_EFLAGS_TF) &&
++	    !(vcpu->arch.msr_misc_features_enables &
++	      MSR_MISC_FEATURES_ENABLES_CPUID_FAULT)) {
++		int r = kvm_emulate_cpuid(vcpu);
++
++		if (r == 1) {
++			if (++vmx->qd_n < QD_SC_MAX)
++				goto qd_reenter;
++			vmx->qd_n = 0;
++			return EXIT_FASTPATH_REENTER_GUEST;
++		}
++
++		pr_warn_ratelimited("kvm: CPUID short-circuit unexpected r=%d\n", r);
++	}
++
++	/*
++	 * QD-RDTSC (0009): RDTSC/RDTSCP-Short-Circuit — der Rueckgabewert
++	 * wurde oben am fruehesten Capture-Punkt kompensiert und gestasht;
++	 * hier nur noch Register schreiben, RIP erhoehen und wie der
++	 * CPUID-Short-Circuit direkt zum VMENTER zurueckspringen (kein
++	 * Loop-Top, kein Exit-Dispatch, kein vcpu_enter_guest-Rundlauf).
++	 */
++	if (qd_rdtsc_exit && !vmx->fail && !is_guest_mode(vcpu) &&
++	    !(vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) &&
++	    !(vmx_get_rflags(vcpu) & X86_EFLAGS_TF) &&
++	    (vmx_get_exit_reason(vcpu).basic == EXIT_REASON_RDTSC ||
++	     vmx_get_exit_reason(vcpu).basic == EXIT_REASON_RDTSCP)) {
++		bool qd_rp = vmx->qd_tsc_rdtscp;
++
++		kvm_register_write(vcpu, VCPU_REGS_RAX, (u32)vmx->qd_tsc_val);
++		kvm_register_write(vcpu, VCPU_REGS_RDX, vmx->qd_tsc_val >> 32);
++		if (qd_rp) {
++			u32 qd_aux;
++
++			rdmsrl(MSR_TSC_AUX, qd_aux);
++			kvm_register_write(vcpu, VCPU_REGS_RCX, qd_aux);
++		}
++		vmx_set_interrupt_shadow(vcpu, 0);
++		kvm_rip_write(vcpu, kvm_rip_read(vcpu) + (qd_rp ? 3 : 2));
++		vmx->qd_tsc_valid = 0;
++
++		if (++vmx->qd_n < QD_SC_MAX)
++			goto qd_reenter;
++		vmx->qd_n = 0;
++		return EXIT_FASTPATH_REENTER_GUEST;
++	}
++	vmx->qd_n = 0;
++
+ 	return vmx_exit_handlers_fastpath(vcpu, force_immediate_exit);
+ }
+ 

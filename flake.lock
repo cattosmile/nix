@@ -1,5 +1,27 @@
 {
   "nodes": {
+    "NixLocalQwen": {
+      "inputs": {
+        "home-manager": "home-manager",
+        "llama-cpp-src": "llama-cpp-src",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788282861,
+        "narHash": "sha256-zNODvd9TpypM520P0zKHx2bGCAdue58eNINtQhrfAbY=",
+        "ref": "refs/heads/main",
+        "rev": "9274b505c89f745184ed3f9b58ef79dcfdf59134",
+        "revCount": 9,
+        "type": "git",
+        "url": "http://192.168.1.117:3000/cattosmile/NixLocalQwen.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "http://192.168.1.117:3000/cattosmile/NixLocalQwen.git"
+      }
+    },
     "aquamarine": {
       "inputs": {
         "hyprutils": [
@@ -235,6 +257,27 @@
     "home-manager": {
       "inputs": {
         "nixpkgs": [
+          "NixLocalQwen",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788146656,
+        "narHash": "sha256-XmJmvk9rytTb7dCotO/aqR+YysB8HOqnprlOdv+LAF4=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "82c265faf4e3161d6015db07c9b0f1ee36a9029b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "home-manager_2": {
+      "inputs": {
+        "nixpkgs": [
           "nixpkgs"
         ]
       },
@@ -253,7 +296,7 @@
         "type": "github"
       }
     },
-    "home-manager_2": {
+    "home-manager_3": {
       "inputs": {
         "nixpkgs": [
           "nixslop",
@@ -824,6 +867,23 @@
         "url": "http://192.168.1.117:3000/cattosmile/ida-pro-nix.git"
       }
     },
+    "llama-cpp-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788167960,
+        "narHash": "sha256-/N9nvn6yFAX6KVGdMKeb/ANUpvtSMUOP4Czm0EFFegY=",
+        "owner": "ggml-org",
+        "repo": "llama.cpp",
+        "rev": "662a0b0121a53c23b825a71e64ab6eff59b7f4d8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ggml-org",
+        "repo": "llama.cpp",
+        "rev": "662a0b0121a53c23b825a71e64ab6eff59b7f4d8",
+        "type": "github"
+      }
+    },
     "llm-agents": {
       "inputs": {
         "bun2nix": "bun2nix",
@@ -1028,7 +1088,7 @@
     "nixslop": {
       "inputs": {
         "codex-desktop-linux": "codex-desktop-linux",
-        "home-manager": "home-manager_2",
+        "home-manager": "home-manager_3",
         "nixpkgs": "nixpkgs_5",
         "systems": "systems_5"
       },
@@ -1131,8 +1191,9 @@
     },
     "root": {
       "inputs": {
+        "NixLocalQwen": "NixLocalQwen",
         "disko": "disko",
-        "home-manager": "home-manager",
+        "home-manager": "home-manager_2",
         "hyprland": "hyprland",
         "hyprpaper": "hyprpaper",
         "ida-pro": "ida-pro",
