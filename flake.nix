@@ -38,12 +38,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixslop.url = "github:cattosmile/NixSlop";
-    NixLocalQwen = {
+    localqwen = {
       url = "git+http://192.168.1.117:3000/cattosmile/NixLocalQwen.git";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    switcha = {
-      url = "path:/home/user/Projects/Switcha";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     opencode = {
@@ -53,6 +49,10 @@
     llm-agents.url = "github:numtide/llm-agents.nix";
     ida-pro = {
       url = "git+http://192.168.1.117:3000/cattosmile/ida-pro-nix.git";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    gaping = {
+      url = "path:/home/user/Projects/gaping";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -90,6 +90,8 @@
               inputs.sops-nix.homeManagerModules.sops
               nix-flatpak.homeManagerModules.nix-flatpak
               inputs.ida-pro.homeManagerModules.default
+              inputs.localqwen.homeManagerModules.default
+              inputs.gaping.homeManagerModules.default
             ];
             home-manager.extraSpecialArgs = { inherit inputs; };
           }

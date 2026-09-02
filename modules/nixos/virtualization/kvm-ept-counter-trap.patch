@@ -1,0 +1,705 @@
+From: QemuDetection
+Subject: [PATCH 0011 v4] KVM: EPT-Falle auf der VMAware-TIMER-Counter-Seite (v13)
+
+VM::TIMER misst CPUID- gegen SERIALIZE-Fenster in Ticks eines Cross-Core-
+Counters; beide Fenster enthalten dieselben zwei Loads der Counter-Seite.
+Ratio = (X+E)/(X+S): die eine 4K-Seite per EPT not-present stellen und
+jeden Zugriff emulieren senkt die Ratio unter Threshold 2.5. Werte
+bleiben korrekt, der Gast sieht keine Ausnahme.
+
+v13 = v12 + Rueckstands-Cap:
+- Bewaffnung im CPUID-Short-Circuit (per-RIP-Sturmgate, strikter
+  Doppel-Fenster-Dekoder: v_pre letzte RIP-relative Load vor der CPUID,
+  v_post erste danach, gleiche 4K-Seite).
+- kvm_rip_read() (VMX-RIP ist lazy — Direktzugriff liefert STALE RIPs).
+- Decoder-Cache (RIP->GVA), Recheck alle 4 Exits: Seitenwanderung durch
+  Windows Standby-Reclaim (1-3x pro Messung) wird in <5 Exits verfolgt.
+- Stateless Schnellpfad fuer Counter-Stores + Load-Latenz
+  qd_ct_ldelay_us (24us): ~10-30 Ticks/Fenster, Ratio ~1.0-1.1.
+- NEU v13: qd_ct_stallticks/qd_ct_stalldelay_us — Rueckstands-Cap:
+  Bei B-Aussetzern (Gast-Scheduler) wuchsen Fenster auf >12000 Ticks
+  und loesten VMAwares IPI-Guard aus (nachgewiesene Rot-Ursache).
+  Ab 6000 Ticks Rueckstand wird A je Store 8us verzoegert — Fenster
+  konvergieren und bleiben unter dem Guard.
+- Diagnose: qd_ct_status (Fenstertick-Histogramm + RIP-Klassen).
+- Experimentell (default aus): qd_ct_fifo (SCHED_FIFO — zerstoert die
+  Messdauer durch RT-Throttle, nicht empfohlen).
+
+Nach-Reboot-Aktivierung (kein Flake-Switch): VM stoppen, dann
+  sudo rmmod kvm_intel && sudo insmod <projekt>/tools/kvm-intel-v13.ko
+Modul liegt ebenda fuer Reboot-Ueberleben.
+
+Verifikation 2026-09-02: Ruhe 7/8 (mit vmaware-Zombie-Cleanup je Scan),
+Speicherdruck 6/6 (v7b-Basis); Restrisiko-Quelle 12000-Guard durch v13
+adressiert — Langzeitserien nach Host-Reboot ausstehend (GPU-D3cold-
+Zwischenfall). Details: TIMER-approach-log.md.
+
+---
+--- a/arch/x86/kvm/vmx/vmx.c	2026-09-02 10:16:09.198550941 +0200
++++ b/arch/x86/kvm/vmx/vmx.c	2026-09-02 10:16:09.202176426 +0200
+@@ -5811,6 +5811,10 @@
+ 			       reason, has_error_code, error_code);
+ }
+ 
++/* QemuDetection qd_ct: EPT-Falle auf der TIMER-Counter-Seite (Def. s.u.) */
++static bool qd_ct_try_trap(struct kvm_vcpu *vcpu, gpa_t gpa);
++static int qd_ct_handle(struct kvm_vcpu *vcpu, unsigned long eq);
++
+ static int handle_ept_violation(struct kvm_vcpu *vcpu)
+ {
+ 	unsigned long exit_qualification = vmx_get_exit_qual(vcpu);
+@@ -5831,6 +5835,17 @@
+ 	trace_kvm_page_fault(vcpu, gpa, exit_qualification);
+ 
+ 	/*
++	 * QemuDetection qd_ct: Zugriff auf die getrappte Counter-Seite statt
++	 * zu mappen EMULIEREN (v6 asymmetrisch: schnelle Stores, teure Loads
++	 * — Details s. qd_ct_handle). Schlaegt die Emulation fehl:
++	 * Standard-Fallthrough.
++	 */
++	if (qd_ct_try_trap(vcpu, gpa)) {
++		if (qd_ct_handle(vcpu, exit_qualification))
++			return 1;
++	}
++
++	/*
+ 	 * Check that the GPA doesn't exceed physical memory limits, as that is
+ 	 * a guest page fault.  We have to emulate the instruction here, because
+ 	 * if the illegal address is that of a paging structure, then
+@@ -6462,10 +6477,594 @@
+ MODULE_PARM_DESC(qd_poller_cpu,
+ 		 "QemuDetection: pin the cache-clock poller kthread to this CPU (-1 = off)");
+ 
++/* ============================================================================
++ * QemuDetection: qd_ct — EPT-Falle auf der TIMER-Counter-Seite (Ansatz A)
++ * ----------------------------------------------------------------------------
++ * VMAware TIMER misst pro Iteration ein SERIALIZE- und ein CPUID-Fenster in
++ * Ticks eines Cross-Core-Counters; BEIDE Fenster enthalten dieselben zwei
++ * Loads der statischen Counter-Seite (state.counter). Auf Intel ist die
++ * CPUID-Exit-Wand (~2300 Zyklen) unueberwindbar, aber die gemeinsamen
++ * Load-Kosten X gehen in beide Fenster ein: Ratio = (X+E)/(X+S). Wird jeder
++ * Zugriff auf diese eine 4K-Seite per EPT-Trap verteuert (Leaf auf
++ * not-present -> EPT-Violation -> kvm_emulate_instruction, ~2000-4000
++ * Zyklen pro Zugriff), faellt die Ratio gegen (2T+2300)/(2T+30) ~ 1.4-1.9.
++ * Gruen ab Trap-Kosten T > ~770 Zyklen — jede Emulation erfuellt das.
++ *
++ * Die Werte bleiben korrekt: Die Emulation liest/schreibt den echten
++ * Host-Speicher (kohaerent mit den Gast-Zugriffen), der Gast sieht keine
++ * Ausnahme, RIP-Advance wie nativ. Der Zaehler tickt dann einmal pro
++ * emuliertem Store (~1 Tick pro Trap-Kosten Ticks) — Fenster liegen bei
++ * ~2-3 Ticks, weit unter VMAwares 12000-IPI-Guard, und v_post > v_pre ist
++ * qua Konstruktion erfuellt (kein Total-Freeze wie bei Ansatz 0010).
++ *
++ * Identifikation der Seite: VMAware misst mit CPUID leaf 0 im CPL3-Sturm.
++ * Bei jedem solchen Exit zeigt RIP auf die CPUID; der v_post-Load direkt
++ * danach (MSVC: mov r64,[rip+disp32]) wird dekodiert, GVA->GPA uebersetzt,
++ * und nach qd_ct_confirm konsistenten Dekodierungen wird die GFN einmal
++ * gezipt und die Falle scharf gestellt. Deinn nach CPUID-Ruhe (die Seite
++ * heilt dann beim ersten Standard-Fault von selbst). Nur der Sturm-vCPU-
++ * Kontext zaehlt; EAC/BattlEye-artige rdtsc;cpuid;rdtsc-Loops feuern das
++ * Dekodieren nicht (nach rdtsc kommt kein MOV-load-Muster) -> keine
++ * Fehlarmung.
++ * ==========================================================================*/
++static int qd_ct = 1;
++static int qd_ct_verbose = 1;
++static int qd_ct_ripstorm = 16;	/* leaf-0-Exits vom GLEICHEN RIP bis Bewaffnung */
++static int qd_ct_win_ms = 2000;	/* Zeitfenster fuer den per-RIP-Sturm */
++static int qd_ct_idle_ms = 3000;
++static int qd_ct_confirm = 2;	/* strenge Dekodierung => 2 genuegen */
++static int qd_ct_recheck = 4;	/* bewaffnet: alle N Exits Seite verifizieren */
++static int qd_ct_mism_max = 1;	/* Decode-Mismatches bis Seitenwechsel */
++static int qd_ct_ldelay_us = 24;
++static int qd_ct_stallticks = 6000;	/* Rueckstands-Cap (v13): A bremsen ab
++					 * dieser Tickdifferenz (Riesenfenster
++					 * bei B-Aussetzern -> 12000-Guard) */
++static int qd_ct_stalldelay_us = 8;	/* A-Bremsverzoegerung je Store */
++static int qd_ct_fifo = 1;	/* Mess-vCPUs waehrend armed auf SCHED_FIFO */	/* zusaetzliche Load-Trap-Latenz (Mikrosek.) */
++static int qd_ct_minticks = 15;	/* Mindest-Stores je Fenster (v9) */
++static int qd_ct_waitceil_us = 250;	/* Warte-Deckel je Read-Trap (us) */
++static int qd_ct_maxticks = 200;	/* Fenster-Deckel: A drosseln, wenn B
++				 * nicht liest (Riesenfenster -> 12000-
++				 * Guard von VMAware, v9e) */
++static ulong qd_ct_gfn_manual = 0;	/* 0 = automatisch; Test: GFN direkt */
++
++module_param(qd_ct, int, 0644);
++MODULE_PARM_DESC(qd_ct, "QemuDetection: EPT-Falle auf der TIMER-Counter-Seite");
++module_param(qd_ct_verbose, int, 0644);
++module_param(qd_ct_ripstorm, int, 0644);
++module_param(qd_ct_win_ms, int, 0644);
++module_param(qd_ct_idle_ms, int, 0644);
++module_param(qd_ct_confirm, int, 0644);
++module_param(qd_ct_recheck, int, 0644);
++module_param(qd_ct_mism_max, int, 0644);
++module_param(qd_ct_ldelay_us, int, 0644);
++module_param(qd_ct_stallticks, int, 0644);
++module_param(qd_ct_stalldelay_us, int, 0644);
++module_param(qd_ct_fifo, int, 0644);
++module_param(qd_ct_gfn_manual, ulong, 0644);
++
++static gfn_t qd_ct_gfn;		/* 0 = Falle inaktiv */
++static struct kvm *qd_ct_kvm;
++static u64 qd_ct_rip;		/* RIP des letzten leaf-0-Sturms */
++static u64 qd_ct_rip_n;		/* Wiederholungen dieses RIP */
++static unsigned long qd_ct_rip_win;	/* Sturm-Start (jiffies) */
++static bool qd_ct_rip_storm;
++static gfn_t qd_ct_last;
++static int qd_ct_conf;
++static unsigned long qd_ct_last_seen;
++static u64 qd_ct_since_arm;
++static int qd_ct_mism;		/* aufeinanderfolgende Mismatches (armed) */
++static gfn_t qd_ct_arm_gfn_last;	/* letzte Bewaffnungs-GFN (Statistik) */
++static u64 qd_ct_narm;		/* Bewaffnungen insgesamt */
++static u64 qd_ct_nswitch;	/* Seitenwechsel durch Recheck */
++static atomic64_t qd_ct_hits;
++static atomic64_t qd_ct_dec;		/* Dekodier-Versuche */
++static atomic64_t qd_ct_decok;		/* Dekodier-Erfolge */
++static atomic64_t qd_ct_nfast;	/* Schnellpfad-Stores (v6) */
++static atomic64_t qd_ct_nslow;	/* voll-emulierte Zugriffe (v6) */
++static u64 qd_ct_last_fail_rip;	/* Dedup fuer Fehler-Log */
++/* v6c-Diagnose: Fensterticks */
++static u64 qd_ct_stores;			/* Store-Traps (A) */
++static u64 qd_ct_reads;				/* Read-Traps (B) */
++static u64 qd_ct_last_read_stores;		/* Stores beim letzten Read-Trap */
++static u64 qd_ct_last_read_tsc;
++static bool qd_ct_pend_vpost;			/* CPUID kam: naechster Read = v_post */
++static u64 qd_ct_vpre_stores;			/* Stores beim v_pre-Read */
++static u64 qd_ct_vt_min = ~0ULL;		/* minimale v-Fensterticks */
++static u64 qd_ct_vt_hist[8];			/* 0,1,2,3,4,5-8,9-16,17+ */
++/* v9c: Mess-Thread-Boost — verhindert A-Verhungern unter Spiel-/EAC-Last */
++static struct task_struct *qd_ct_taskA, *qd_ct_taskB;
++/* v6d: RIP-klassifizierte Read-Fenster (haeufigste Read-RIPs + Ticks) */
++struct qd_ct_ripstat {
++	u64 rip;
++	u64 n, tsum, tmin, tsc_sum;
++};
++static struct qd_ct_ripstat qd_ct_rs[10];
++
++static void qd_ct_tick(struct work_struct *w);
++static DECLARE_DELAYED_WORK(qd_ct_work, qd_ct_tick);
++
++static bool qd_ct_armed_any(void);
++
++static int qd_ct_status_get(char *buf, const struct kernel_param *kp)
++{
++	int i, o;
++
++	o = scnprintf(buf, PAGE_SIZE,
++		      "armed=%d gfn=%llx dec=%lld ok=%lld hits=%lld fast=%lld arm=%llu sw=%llu stores=%llu reads=%llu vt_min=%llu vt_hist=%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",
++		      qd_ct_armed_any(), (unsigned long long)qd_ct_gfn,
++		      atomic64_read(&qd_ct_dec),
++		      atomic64_read(&qd_ct_decok),
++		      atomic64_read(&qd_ct_hits),
++		      atomic64_read(&qd_ct_nfast),
++		      qd_ct_narm, qd_ct_nswitch,
++		      qd_ct_stores, qd_ct_reads,
++		      qd_ct_vt_min == ~0ULL ? 0 : qd_ct_vt_min,
++		      qd_ct_vt_hist[0], qd_ct_vt_hist[1], qd_ct_vt_hist[2],
++		      qd_ct_vt_hist[3], qd_ct_vt_hist[4], qd_ct_vt_hist[5],
++		      qd_ct_vt_hist[6], qd_ct_vt_hist[7]);
++	for (i = 0; i < ARRAY_SIZE(qd_ct_rs) && qd_ct_rs[i].n; i++) {
++		o += scnprintf(buf + o, PAGE_SIZE - o,
++			       "  rip%u=%llx n=%llu ticks_avg=%llu tmin=%llu tsc_avg=%llu\n",
++			       i, (unsigned long long)qd_ct_rs[i].rip,
++			       qd_ct_rs[i].n,
++			       qd_ct_rs[i].tsum / qd_ct_rs[i].n,
++			       qd_ct_rs[i].tmin,
++			       qd_ct_rs[i].tsc_sum / qd_ct_rs[i].n);
++	}
++	return o;
++}
++
++static const struct kernel_param_ops qd_ct_status_ops = {
++	.get = qd_ct_status_get,
++};
++module_param_cb(qd_ct_status, &qd_ct_status_ops, NULL, 0444);
++
++static bool qd_ct_try_trap(struct kvm_vcpu *vcpu, gpa_t gpa)
++{
++	if (!qd_ct_gfn || vcpu->kvm != qd_ct_kvm ||
++	    (gpa >> PAGE_SHIFT) != qd_ct_gfn)
++		return false;
++	atomic64_inc(&qd_ct_hits);
++	return true;
++}
++
++static bool qd_ct_armed_any(void)
++{
++	return qd_ct_gfn != 0;
++}
++
++/*
++ * QemuDetection v6 — asymmetrische Trap-Kosten fuer stabile Fensterticks:
++ * VMAwares Fenster sind GANZZAHLIGE Ticks (Stores des Counter-Threads
++ * zwischen zwei Loads). Bei symmetrischen Trap-Kosten T liegen nur ~2-3
++ * Ticks pro Fenster an; unter Last fallen SERIALIZE-Fenster haeufig auf
++ * 0 Ticks (Sample invalid) und Floor-Effekte druecken die Ratio sporadisch
++ * ueber 2.5. Abhilfe: A's Stores (write-Violations) ueber einen Mini-Pfad
++ * (nur MOV [rip+disp32], r64 dekodieren + 8 Bytes schreiben) => T_A klein;
++ * B's Loads (read-Violations) ueber Voll-Emulation plus definierter Latenz
++ * (qd_ct_ldelay_us) => T_B gross. Fensterticks ~ (2*T_B)/T_A (>=20),
++ * Ratio ~ (2*T_B+2300)/(2*T_B+30) ~ 1.05 — lastunabhaengig stabil, weit
++ * unter Threshold 2.5 und weit unter dem 12000-IPI-Guard.
++ */
++/*
++ * v8: RIP-gecachter Schnellpfad. A's Counter-Store hat EINEN festen RIP
++ * (MOV [rip+disp32], reg64) — Dekodierung + GVA einmal pro RIP cachen,
++ * pro Store nur noch Register lesen + 8 Bytes an die (bei Migration
++ * revalidierte) GPA schreiben. T_A faellt von ~3.5k auf ~1k Zyklen =>
++ * ~70-100 Ticks pro Fenster: Guard-Reserve >120x, IQR-stabil gegen
++ * Scheduling-Streuung, Ratio ~ (2*T_B+2300)/(2*T_B+30) ~ 1.03.
++ */
++static int qd_ct_fast_store(struct kvm_vcpu *vcpu)
++{
++	unsigned char c[8];
++	struct x86_exception ex;
++	u64 rip = kvm_rip_read(vcpu);
++	u64 gva, gpa, val;
++	u8 rex = 0;
++	int i = 0, reg;
++
++	if (kvm_read_guest_virt(vcpu, (gva_t)rip, c, sizeof(c), &ex) !=
++	    X86EMUL_CONTINUE)
++		return -1;
++	while (i < 2 && c[i] >= 0x40 && c[i] <= 0x4f)
++		rex = c[i++];
++	if (!(rex & 8) || c[i] != 0x89)		/* MOV r/m64, r64 (REX.W) */
++		return -1;
++	i++;
++	if ((c[i] & 0xc7) != 0x05)		/* mod=00 rm=101: [rip+disp32] */
++		return -1;
++	reg = ((c[i] >> 3) & 7) | ((rex & 4) ? 8 : 0);
++	gva = rip + i + 5 + *(s32 *)(c + i + 1);
++	val = kvm_register_read_raw(vcpu, reg);
++	gpa = kvm_mmu_gva_to_gpa_read(vcpu, (gva_t)gva, &ex);
++	if (gpa == INVALID_GPA)
++		return -1;
++	if (kvm_write_guest(vcpu->kvm, gpa, &val, 8) < 0)
++		return -1;
++	kvm_rip_write(vcpu, rip + i + 5);
++	return 0;
++}
++
++static void qd_ct_delay_us(u64 us)
++{
++	u64 cycles = us * (u64)max(tsc_khz, 1000u) / 1000;
++	u64 end = rdtsc() + cycles;
++
++	while ((s64)(end - rdtsc()) > 0)
++		cpu_relax();
++}
++
++/* v6c: Fenstertick-Statistik wird in qd_ct_handle gepflegt */
++
++static int qd_ct_handle(struct kvm_vcpu *vcpu, unsigned long eq)
++{
++	bool is_write = eq & EPT_VIOLATION_ACC_WRITE;
++	int r;
++
++	atomic64_inc(&qd_ct_hits);
++	if (!is_write) {
++		u64 rip = kvm_rip_read(vcpu);
++		u64 dt = qd_ct_stores - qd_ct_last_read_stores;
++		u64 dt_tsc = rdtsc() - qd_ct_last_read_tsc;
++		int i, slot = -1;
++
++		qd_ct_reads++;
++		for (i = 0; i < ARRAY_SIZE(qd_ct_rs); i++) {
++			if (qd_ct_rs[i].rip == rip) { slot = i; break; }
++			if (qd_ct_rs[i].n == 0 && slot < 0) slot = i;
++		}
++		if (slot >= 0) {
++			struct qd_ct_ripstat *s = &qd_ct_rs[slot];
++
++			s->rip = rip;
++			s->n++;
++			s->tsum += dt;
++			if (dt < s->tmin || !s->tmin) s->tmin = dt;
++			s->tsc_sum += dt_tsc;
++		}
++		if (qd_ct_pend_vpost) {
++			u64 dtw = qd_ct_stores - qd_ct_vpre_stores;
++
++			qd_ct_pend_vpost = false;
++			if (dtw < qd_ct_vt_min)
++				qd_ct_vt_min = dtw;
++			qd_ct_vt_hist[dtw < 4 ? dtw : (dtw < 5 ? 4 : (dtw < 9 ? 5 :
++				  (dtw < 17 ? 6 : 7)))]++;
++		}
++		qd_ct_last_read_stores = qd_ct_stores;
++		qd_ct_last_read_tsc = rdtsc();
++	} else {
++		qd_ct_stores++;
++
++		/*
++		 * v13 — Rueckstands-Cap: liest B (Mess-Thread) laenger nicht
++		 * (Aussetzer unter Last), wuerde das naechste Fenster auf
++		 * >12000 Ticks anwachsen und VMAwares IPI-Guard ausloesen.
++		 * Ab qd_ct_stallticks Stores Rueckstand wird A je Store um
++		 * qd_ct_stalldelay_us verzoegert — Fenster konvergieren
++		 * gegen ~stallticks + Rest und bleiben guenstig.
++		 */
++		if (qd_ct_stallticks &&
++		    (s64)(qd_ct_stores - qd_ct_last_read_stores) > qd_ct_stallticks)
++			qd_ct_delay_us(qd_ct_stalldelay_us);
++
++		if (qd_ct_fast_store(vcpu) == 0) {
++			atomic64_inc(&qd_ct_nfast);
++			return 1;
++		}
++		atomic64_inc(&qd_ct_nslow);
++	}
++
++	r = kvm_emulate_instruction(vcpu, 0);
++	if (r && !is_write && qd_ct_ldelay_us)
++		qd_ct_delay_us(qd_ct_ldelay_us);
++	return r;
++}
++
++static void qd_ct_unboost(struct task_struct **slot)
++{
++	struct task_struct *t = *slot;
++
++	if (!t)
++		return;
++	*slot = NULL;
++	if (qd_ct_fifo) {
++		sched_set_normal(t, 0);
++	} else {
++		set_user_nice(t, 0);
++	}
++	put_task_struct(t);
++}
++
++static void qd_ct_task_reset(void)
++{
++	qd_ct_unboost(&qd_ct_taskA);
++	qd_ct_unboost(&qd_ct_taskB);
++}
++
++static void qd_ct_disarm(const char *why)
++{
++	if (!qd_ct_armed_any())
++		return;
++	cancel_delayed_work(&qd_ct_work);
++	if (qd_ct_verbose)
++		pr_info("QD-CT: Falle entschaerft (%s), gfn=%llx Treffer=%lld\n",
++			why, (unsigned long long)qd_ct_gfn,
++			(long long)atomic64_read(&qd_ct_hits));
++	/*
++	 * Kein Zap noetig: Der Leaf ist weiterhin not-present; ohne Hook
++	 * laeuft der naechste Zugriff durch den Standard-Fault und der
++	 * Present-SPTE heilt selbst.
++	 */
++	qd_ct_gfn = 0;
++	qd_ct_kvm = NULL;
++	qd_ct_conf = 0;
++	qd_ct_last = 0;
++	qd_ct_mism = 0;
++	qd_ct_rip_storm = false;
++	qd_ct_rip_n = 0;
++	qd_ct_task_reset();
++}
++
++static void qd_ct_tick(struct work_struct *w)
++{
++	if (!qd_ct_armed_any())
++		return;
++	if (time_after(jiffies, qd_ct_last_seen + msecs_to_jiffies(qd_ct_idle_ms)))
++		qd_ct_disarm("CPUID-Ruhe");
++	else
++		schedule_delayed_work(&qd_ct_work, msecs_to_jiffies(500));
++}
++
++/*
++ * Finde die Counter-Seite des TIMER-Mess-Loops. Offizielles VMAware 2.8.1
++ * (MSVC): direkt nach der CPUID folgen die vier __cpuid-Ergebnis-STORES
++ * (89 /r) — der v_post-Load liegt erst ~17 Bytes spaeter; v_pre ~12 Bytes
++ * davor. Beide (und alle Sync-Spin-Loads) sind RIP-relative Loads
++ * (48/4C 8B /r, mod=00 rm=101) auf dieselbe Seite (state.counter).
++ * Scan: LETZTE solche Load vor der CPUID, ERSTE nach ihr.
++ */
++static bool qd_ct_scan_rel(const unsigned char *buf, int len, u64 win_base,
++			   u64 *gva_out, bool last)
++{
++	int i, hit = -1;
++
++	for (i = 0; i + 7 <= len; i++) {
++		if ((buf[i] == 0x48 || buf[i] == 0x4c) &&
++		    buf[i + 1] == 0x8b && (buf[i + 2] & 0xc7) == 0x05)
++			hit = i;
++		if (!last && hit >= 0)
++			break;
++	}
++	if (hit < 0)
++		return false;
++	*gva_out = win_base + hit + 7 + *(s32 *)(buf + hit + 3);
++	return true;
++}
++
++/*
++ * STRENGE Dekodierung (Bewaffnung + Recheck): v_pre-Load UND v_post-Load
++ * RIP-relativ dekodierbar UND beide auf derselben 4K-Seite. ntddll/Game-
++ * CPUIDs mit zufaellig passendem Einzel-Load werden damit nicht bewaffnet.
++ */
++static bool qd_ct_decode_strict2(struct kvm_vcpu *vcpu, gfn_t *gfn_out,
++				       u64 *gva_out)
++{
++	unsigned char pre[40], post[32];
++	struct x86_exception ex;
++	u64 rip = kvm_rip_read(vcpu);	/* zeigt auf 0F A2 */
++	u64 gv_pre = 0, gv_post = 0, gpa;
++
++	if (rip < sizeof(pre) + 0x1000)
++		return false;
++	if (kvm_read_guest_virt(vcpu, (gva_t)(rip - sizeof(pre)), pre,
++				sizeof(pre), &ex) != X86EMUL_CONTINUE)
++		return false;
++	if (kvm_read_guest_virt(vcpu, (gva_t)(rip + 2), post,
++				sizeof(post), &ex) != X86EMUL_CONTINUE)
++		return false;
++
++	atomic64_inc(&qd_ct_dec);
++
++	if (!qd_ct_scan_rel(pre, sizeof(pre), rip - sizeof(pre),
++			    &gv_pre, true) ||
++	    !qd_ct_scan_rel(post, sizeof(post), rip + 2, &gv_post, false))
++		goto fail;
++	if ((gv_pre >> 12) != (gv_post >> 12))
++		goto fail;
++	if (gv_pre < 0x10000 || gv_pre > 0x00007fffffffffffull)
++		goto fail;
++	gpa = kvm_mmu_gva_to_gpa_read(vcpu, (gva_t)gv_pre, &ex);
++	if (gpa == INVALID_GPA)
++		goto fail;
++	atomic64_inc(&qd_ct_decok);
++	*gfn_out = gpa >> PAGE_SHIFT;
++	if (gva_out)
++		*gva_out = gv_pre;
++	return true;
++
++fail:
++	if (rip != qd_ct_last_fail_rip) {
++		qd_ct_last_fail_rip = rip;
++		pr_info_ratelimited("QD-CT: kein strict-Muster @%llx: pre=%02x%02x post=%02x%02x\n",
++				    (unsigned long long)rip,
++				    pre[30], pre[31], post[0], post[1]);
++	}
++	return false;
++}
++
++static bool qd_ct_decode_strict(struct kvm_vcpu *vcpu, gfn_t *gfn_out)
++{
++	return qd_ct_decode_strict2(vcpu, gfn_out, NULL);
++}
++
++/*
++ * v11 — Decoder-Cache: pro CPUID-RIP die dekodierte Counter-GVA merken;
++ * Recheck dann bei JEDEM Exit ohne Code-Read (nur noch der GVA-Walk,
++ * ~1k Zyklen). Bewaffnungsluecke bei Seitenwanderung schliesst sich auf
++ * ~1 Exit.
++ */
++struct qd_ct_dcache {
++	u64 rip;
++	u64 gva;
++};
++static struct qd_ct_dcache qd_ct_dc[4];
++
++static bool qd_ct_decode_fast(struct kvm_vcpu *vcpu, gfn_t *gfn_out)
++{
++	u64 rip = kvm_rip_read(vcpu);
++	struct x86_exception ex;
++	gpa_t gpa;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(qd_ct_dc); i++) {
++		if (qd_ct_dc[i].rip == rip) {
++			gpa = kvm_mmu_gva_to_gpa_read(vcpu, (gva_t)qd_ct_dc[i].gva, &ex);
++			if (gpa == INVALID_GPA)
++				return false;
++			*gfn_out = gpa >> PAGE_SHIFT;
++			return true;
++		}
++	}
++	/* Cache-Miss: voller strict-Decode + Cache-Fill */
++	{
++		u64 gva = 0;
++
++		if (!qd_ct_decode_strict2(vcpu, gfn_out, &gva))
++			return false;
++		for (i = 0; i < ARRAY_SIZE(qd_ct_dc); i++) {
++			if (!qd_ct_dc[i].rip) {
++				qd_ct_dc[i].rip = rip;
++				qd_ct_dc[i].gva = gva;
++				break;
++			}
++		}
++		return true;
++	}
++}
++
++static void qd_ct_arm(struct kvm_vcpu *vcpu, gfn_t gfn)
++{
++	qd_ct_kvm = vcpu->kvm;
++	qd_ct_gfn = gfn;
++	qd_ct_arm_gfn_last = gfn;
++	qd_ct_narm++;
++	atomic64_set(&qd_ct_hits, 0);
++	qd_ct_since_arm = 0;
++	qd_ct_mism = 0;
++	qd_ct_stores = 0;
++	qd_ct_reads = 0;
++	qd_ct_last_read_stores = 0;
++	qd_ct_vpre_stores = 0;
++	qd_ct_pend_vpost = false;
++	qd_ct_vt_min = ~0ULL;
++	memset(qd_ct_vt_hist, 0, sizeof(qd_ct_vt_hist));
++	memset(qd_ct_rs, 0, sizeof(qd_ct_rs));
++	/* Present-SPTE entfernen -> alle zukuenftigen Zugriffe exiten */
++	kvm_zap_gfn_range(vcpu->kvm, gfn, gfn + 1);
++	schedule_delayed_work(&qd_ct_work, msecs_to_jiffies(500));
++	if (qd_ct_verbose)
++		pr_info("QD-CT: Falle scharf, gfn=%llx (vcpu%u rip=%llx)\n",
++			(unsigned long long)gfn, vcpu->vcpu_id,
++			(unsigned long long)vcpu->arch.regs[VCPU_REGS_RIP]);
++}
++
++/* Aufruf im CPUID-Short-Circuit VOR kvm_emulate_cpuid (RIP zeigt auf CPUID) */
++static void qd_ct_maybe(struct kvm_vcpu *vcpu)
++{
++	gfn_t gfn;
++	int i;
++	u64 rip = kvm_rip_read(vcpu);
++
++	if (!qd_ct)
++		return;
++
++	if (qd_ct_gfn_manual && !qd_ct_armed_any()) {
++		qd_ct_arm(vcpu, (gfn_t)qd_ct_gfn_manual);
++		return;
++	}
++
++	if (vcpu->arch.regs[VCPU_REGS_RAX])	/* VMAware misst mit leaf 0 */
++		return;
++	qd_ct_last_seen = jiffies;
++
++	/*
++	 * Per-RIP-Sturmgate: VMAwares Mess-Loop feuert tausende leaf-0-CPUIDs
++	 * von EINEM RIP; ntdll-/Prozessstart-Bursts streuen ueber viele RIPs
++	 * und erreichen die Schwelle nie.
++	 */
++	if (rip == qd_ct_rip) {
++		qd_ct_rip_n++;
++	} else {
++		qd_ct_rip = rip;
++		qd_ct_rip_n = 1;
++		qd_ct_rip_win = jiffies;
++		qd_ct_rip_storm = false;
++	}
++	if (!qd_ct_rip_storm) {
++		if (qd_ct_rip_n < (u64)qd_ct_ripstorm)
++			return;
++		if (time_after(jiffies,
++			       qd_ct_rip_win + msecs_to_jiffies(qd_ct_win_ms)))
++			return;		/* zu langsam — kein Sturm */
++		qd_ct_rip_storm = true;
++	}
++
++	if (qd_ct_armed_any()) {
++		qd_ct_since_arm++;
++		/* v6c: v-Fenster-Markierung (v_pre = letzter Read-Trap) */
++		qd_ct_vpre_stores = qd_ct_last_read_stores;
++		qd_ct_pend_vpost = true;
++		if ((qd_ct_since_arm & 63) == 0)
++			kvm_zap_gfn_range(qd_ct_kvm, qd_ct_gfn,
++					  qd_ct_gfn + 1);
++		if (qd_ct_since_arm == 512 &&
++		    !atomic64_read(&qd_ct_hits)) {
++			qd_ct_disarm("keine Treffer, falsche Seite");
++			return;
++		}
++		/*
++		 * Mid-Storm-Recheck: Dekodiert der Sturm-RIP konsistent eine
++		 * ANDERE Seite, steht die Falle falsch/veraltet (zweiter
++		 * Scanner-Prozess, neue Session) — nach qd_ct_mism_max
++		 * Mismatches freigeben; der normale Pfad bewaffnet sofort
++		 * auf die neue Seite. Strict-Decodes von Fremd-RIPs, die
++		 * nicht matchen, zaehlen NICHT als Mismatch (neutral).
++		 */
++		if (qd_ct_since_arm % qd_ct_recheck == 0 &&
++		    qd_ct_decode_fast(vcpu, &gfn)) {
++			if (gfn == qd_ct_gfn) {
++				qd_ct_mism = 0;
++			} else if (++qd_ct_mism >= qd_ct_mism_max) {
++				qd_ct_nswitch++;
++				qd_ct_disarm("Seite gewechselt");
++			}
++		}
++		return;
++	}
++
++	if (!qd_ct_decode_strict(vcpu, &gfn))
++		return;
++	if (gfn == qd_ct_last) {
++		qd_ct_conf++;
++	} else {
++		pr_info_ratelimited("QD-CT: decode gfn=%llx conf-reset\n",
++				    (unsigned long long)gfn);
++		qd_ct_last = gfn;
++		qd_ct_conf = 1;
++	}
++	if (qd_ct_conf >= qd_ct_confirm)
++		qd_ct_arm(vcpu, gfn);
++}
++
+ static int handle_cpuid(struct kvm_vcpu *vcpu)
+ {
+ 	int r;
+ 
++	if (qd_ct && vmx_get_cpl(vcpu) == 3)
++		qd_ct_maybe(vcpu);
++
+ 	if (vcpu->vcpu_id < KVM_MAX_VCPUS && READ_ONCE(qd_poller_task) &&
+ 	    vmx_get_cpl(vcpu) == 3) {
+ 		qd_update_cands(vcpu);
+@@ -8216,6 +8815,15 @@
+ 	    !(vmx_get_rflags(vcpu) & X86_EFLAGS_TF) &&
+ 	    !(vcpu->arch.msr_misc_features_enables &
+ 	      MSR_MISC_FEATURES_ENABLES_CPUID_FAULT)) {
++		/*
++		 * QemuDetection qd_ct: CPUID-Exits laufen praktisch immer
++		 * ueber diesen Short-Circuit (handle_cpuid wird nie erreicht)
++		 * — Bewaffnungslogik hier, VOR kvm_emulate_cpuid (RIP zeigt
++		 * noch auf die CPUID-Instruktion).
++		 */
++		if (qd_ct && vmx_get_cpl(vcpu) == 3)
++			qd_ct_maybe(vcpu);
++
+ 		int r = kvm_emulate_cpuid(vcpu);
+ 
+ 		if (r == 1) {
+@@ -9083,6 +9691,13 @@
+ {
+ 	struct kvm_vmx *kvm_vmx = to_kvm_vmx(kvm);
+ 
++	/* QemuDetection qd_ct: Status dieser VM freigeben (kein Zap: tot) */
++	if (kvm == qd_ct_kvm) {
++		cancel_delayed_work(&qd_ct_work);
++		qd_ct_gfn = 0;
++		qd_ct_kvm = NULL;
++	}
++
+ 	free_pages((unsigned long)kvm_vmx->pid_table, vmx_get_pid_table_order(kvm));
+ }
+ 
+@@ -9427,7 +10042,10 @@
+ {
+ 	allow_smaller_maxphyaddr = false;
+ 
+-qd_poller_teardown();
++	qd_poller_teardown();
++	cancel_delayed_work_sync(&qd_ct_work);
++	qd_ct_gfn = 0;
++	qd_ct_kvm = NULL;
+ 
+ 	vmx_cleanup_l1d_flush();
+ 

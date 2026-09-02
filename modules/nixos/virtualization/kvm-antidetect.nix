@@ -88,5 +88,17 @@
       name = "kvm-qd-timer-stack";
       patch = ./kvm-qd-timer-stack.patch;
     }
+    {
+      # 0011 / QemuDetection / VM::TIMER "timing anomalies" GRÜN (2026-09-02):
+      # EPT-Falle auf der VMAware-Counter-Seite — beide Messfenster teilen
+      # die zwei Loads der Counter-Seite; werden diese per EPT-Trap teuer
+      # (Exit+Emulation je Zugriff), fällt die Ratio (X+E)/(X+S) unter 2.5.
+      # Verifiziert: offizielles VMAware 2.8.1 → 1/85, TIMER NOT DETECTED
+      # (8c×2t, reproduzierbar, A/B per qd_ct=0/1). Basis = Baum mit
+      # kvm-qd-timer-stack; kanonische Quelle:
+      # QemuDetection/patches/kernel/0011-kvm-ept-counter-trap.patch
+      name = "kvm-ept-counter-trap";
+      patch = ./kvm-ept-counter-trap.patch;
+    }
   ];
 }

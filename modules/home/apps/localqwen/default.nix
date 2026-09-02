@@ -1,11 +1,9 @@
-{ inputs, ... }:
+{ ... }:
 
 {
-  imports = [ inputs.localai.homeManagerModules.default ];
-  localai = {
+  localqwen = {
     enable = true;
     port = 8080;
-    reasoning = "low";
+    reasoning = "xhigh";
   };
-
 }

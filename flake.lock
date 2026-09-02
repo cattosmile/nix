@@ -1,27 +1,5 @@
 {
   "nodes": {
-    "NixLocalQwen": {
-      "inputs": {
-        "home-manager": "home-manager",
-        "llama-cpp-src": "llama-cpp-src",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1788282861,
-        "narHash": "sha256-zNODvd9TpypM520P0zKHx2bGCAdue58eNINtQhrfAbY=",
-        "ref": "refs/heads/main",
-        "rev": "9274b505c89f745184ed3f9b58ef79dcfdf59134",
-        "revCount": 9,
-        "type": "git",
-        "url": "http://192.168.1.117:3000/cattosmile/NixLocalQwen.git"
-      },
-      "original": {
-        "type": "git",
-        "url": "http://192.168.1.117:3000/cattosmile/NixLocalQwen.git"
-      }
-    },
     "aquamarine": {
       "inputs": {
         "hyprutils": [
@@ -254,28 +232,24 @@
         "type": "github"
       }
     },
-    "home-manager": {
+    "gaping": {
       "inputs": {
         "nixpkgs": [
-          "NixLocalQwen",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1788146656,
-        "narHash": "sha256-XmJmvk9rytTb7dCotO/aqR+YysB8HOqnprlOdv+LAF4=",
-        "owner": "nix-community",
-        "repo": "home-manager",
-        "rev": "82c265faf4e3161d6015db07c9b0f1ee36a9029b",
-        "type": "github"
+        "lastModified": 1788387087,
+        "narHash": "sha256-t3Kvf2OCKeO4QqGeiN7sG91IjP4abycyxMAenGw5LKg=",
+        "path": "/home/user/Projects/gaping",
+        "type": "path"
       },
       "original": {
-        "owner": "nix-community",
-        "repo": "home-manager",
-        "type": "github"
+        "path": "/home/user/Projects/gaping",
+        "type": "path"
       }
     },
-    "home-manager_2": {
+    "home-manager": {
       "inputs": {
         "nixpkgs": [
           "nixpkgs"
@@ -292,6 +266,27 @@
       "original": {
         "owner": "nix-community",
         "ref": "release-26.05",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "home-manager_2": {
+      "inputs": {
+        "nixpkgs": [
+          "localqwen",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788146656,
+        "narHash": "sha256-XmJmvk9rytTb7dCotO/aqR+YysB8HOqnprlOdv+LAF4=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "82c265faf4e3161d6015db07c9b0f1ee36a9029b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
         "repo": "home-manager",
         "type": "github"
       }
@@ -906,6 +901,28 @@
         "type": "github"
       }
     },
+    "localqwen": {
+      "inputs": {
+        "home-manager": "home-manager_2",
+        "llama-cpp-src": "llama-cpp-src",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788290766,
+        "narHash": "sha256-HoTXT/gr4x7Y83qCDHMllTetnABlVDpD0KAppXkJxTI=",
+        "ref": "refs/heads/main",
+        "rev": "38be4633724e1eba31aa4be8d4d98cedc2b84a00",
+        "revCount": 16,
+        "type": "git",
+        "url": "http://192.168.1.117:3000/cattosmile/NixLocalQwen.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "http://192.168.1.117:3000/cattosmile/NixLocalQwen.git"
+      }
+    },
     "nix-flatpak": {
       "locked": {
         "lastModified": 1767983141,
@@ -1191,13 +1208,14 @@
     },
     "root": {
       "inputs": {
-        "NixLocalQwen": "NixLocalQwen",
         "disko": "disko",
-        "home-manager": "home-manager_2",
+        "gaping": "gaping",
+        "home-manager": "home-manager",
         "hyprland": "hyprland",
         "hyprpaper": "hyprpaper",
         "ida-pro": "ida-pro",
         "llm-agents": "llm-agents",
+        "localqwen": "localqwen",
         "nix-flatpak": "nix-flatpak",
         "nixcord": "nixcord",
         "nixpkgs": "nixpkgs_3",
@@ -1208,8 +1226,7 @@
         "quickshell": "quickshell",
         "sls-steam": "sls-steam",
         "sops-nix": "sops-nix",
-        "spicetify-nix": "spicetify-nix",
-        "switcha": "switcha"
+        "spicetify-nix": "spicetify-nix"
       }
     },
     "sls-steam": {
@@ -1269,23 +1286,6 @@
         "owner": "Gerg-L",
         "repo": "spicetify-nix",
         "type": "github"
-      }
-    },
-    "switcha": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1786215285,
-        "narHash": "sha256-uyUGFLKzj77gY26p5LPLb3YAXL7IbyZJawDpC/i5nug=",
-        "path": "/home/user/Projects/Switcha",
-        "type": "path"
-      },
-      "original": {
-        "path": "/home/user/Projects/Switcha",
-        "type": "path"
       }
     },
     "systems": {
