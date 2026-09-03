@@ -695,8 +695,7 @@ Zwischenfall). Details: TIMER-approach-log.md.
  {
  	allow_smaller_maxphyaddr = false;
  
--qd_poller_teardown();
-+	qd_poller_teardown();
+ 	qd_poller_teardown();
 +	cancel_delayed_work_sync(&qd_ct_work);
 +	qd_ct_gfn = 0;
 +	qd_ct_kvm = NULL;
