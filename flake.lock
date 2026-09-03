@@ -239,14 +239,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1788387087,
-        "narHash": "sha256-t3Kvf2OCKeO4QqGeiN7sG91IjP4abycyxMAenGw5LKg=",
-        "path": "/home/user/Projects/gaping",
-        "type": "path"
+        "lastModified": 1788398184,
+        "narHash": "sha256-e3MTYku/GD6vNvBzw6kR0s1c2Q90gPicFStYM8gaLH0=",
+        "ref": "refs/heads/main",
+        "rev": "445b63eec26ed53922dffd54fb35c0fb30e62b74",
+        "revCount": 6,
+        "type": "git",
+        "url": "http://192.168.1.117:3000/cattosmile/gaping.git"
       },
       "original": {
-        "path": "/home/user/Projects/gaping",
-        "type": "path"
+        "type": "git",
+        "url": "http://192.168.1.117:3000/cattosmile/gaping.git"
       }
     },
     "home-manager": {

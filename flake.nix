@@ -52,7 +52,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     gaping = {
-      url = "path:/home/user/Projects/gaping";
+      url = "git+http://192.168.1.117:3000/cattosmile/gaping.git";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
